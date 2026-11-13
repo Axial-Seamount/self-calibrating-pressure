@@ -611,7 +611,9 @@ def correct_day(client: Client, models: dict[str, DriftModel], day: date, out: P
 
 def write_day_manifest(args: argparse.Namespace, entry: dict) -> Path:
     args.manifest_dir.mkdir(parents=True, exist_ok=True)
-    path = args.manifest_dir / f"scpr_corrected_{entry['date_utc']}.json"
+    offsets = getattr(args, "offsets", "glenn")
+    name = f"scpr_corrected_{entry['date_utc']}" if offsets == "glenn" else f"scpr_corrected_{offsets}_{entry['date_utc']}"
+    path = args.manifest_dir / f"{name}.json"
     path.write_text(json.dumps({**settings(args), **entry}, indent=2) + "\n", encoding="utf-8")
     return path
 

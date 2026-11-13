@@ -52,11 +52,14 @@ def yesterday() -> date:
 
 def calibration_options(**overrides) -> argparse.Namespace:
     """The scpr_calibrate settings, defaults unless overridden."""
-    opts = dict(table=sc.DEFAULT_TABLE, method="fit", max_extrapolation_days=365.0, settle_seconds=1800.0,
+    opts = dict(table=sc.DEFAULT_TABLE, method="fit", offsets="glenn", max_extrapolation_days=365.0,
+                settle_seconds=1800.0,
                 exclude_before=date.fromisoformat(sc.DEFAULT_EXCLUDE_BEFORE), no_thermal=False,
                 mseed=DEFAULT_MSEED, out=sc.DEFAULT_CORRECTED, manifest_dir=DEFAULT_MANIFEST,
                 report_dir=sc.DEFAULT_REPORT, model_dir=sc.MODEL_DIR)
     opts.update(overrides)
+    if opts["offsets"] != "glenn":           # second product next to the default one, never mixed with it
+        opts["out"] = Path(f"{sc.DEFAULT_CORRECTED}_{opts['offsets']}")
     return argparse.Namespace(**opts)
 
 
@@ -113,11 +116,11 @@ _WORKER_STATE: dict = {}
 
 def _correct_task(job: tuple[date, str]) -> tuple[date, str | None, dict | None]:
     """Worker: correct one already-converted day; (day, error or None, manifest entry)."""
-    day, method = job
+    day, method, offsets = job
     try:
-        if _WORKER_STATE.get("method") != method:      # models and client once per worker process
-            opts = calibration_options(method=method)
-            _WORKER_STATE.update(method=method, opts=opts, models=sc.build_models(opts, verbose=False)[0],
+        if _WORKER_STATE.get("key") != (method, offsets):  # models and client once per worker process
+            opts = calibration_options(method=method, offsets=offsets)
+            _WORKER_STATE.update(key=(method, offsets), opts=opts, models=sc.build_models(opts, verbose=False)[0],
                                  client=Client(str(DEFAULT_MSEED)))
         st = _WORKER_STATE
         entry = sc.correct_day(st["client"], st["models"], day, st["opts"].out, st["opts"].settle_seconds)
@@ -134,7 +137,7 @@ def cmd_day(args: argparse.Namespace) -> None:
         raise ValueError("--end is before DATE")
     if not sc.DEFAULT_TABLE.exists():
         raise ValueError(f"{sc.DEFAULT_TABLE} is missing; pull the repo or run 'python scpr.py build'")
-    opts = calibration_options(method=args.method)
+    opts = calibration_options(method=args.method, offsets=args.offsets)
     models, _ = sc.build_models(opts, verbose=False)
     print(f"Calibration table {sc.table_version(opts.table)}: "
           + ", ".join(f"{g} {len(m.t)} events to {sc.iso_s(m.t[-1])[:10]}" for g, m in models.items()))
@@ -171,7 +174,7 @@ def cmd_day(args: argparse.Namespace) -> None:
                 _convert_task((prev, False))
 
         # Phase 2: drift-correct (reads the converted days, writes only its own day).
-        for day, error, entry in mapper(_correct_task, [(d, args.method) for d in converted]):
+        for day, error, entry in mapper(_correct_task, [(d, args.method, args.offsets) for d in converted]):
             if error:
                 print(f"{day}: ERROR {error}", flush=True)
                 failed.append(day)
@@ -213,7 +216,7 @@ def build(start: date, end: date) -> tuple[str, str]:
 
 def stale_days(version: str) -> list[date]:
     out = []
-    for path in sorted(DEFAULT_MANIFEST.glob("scpr_corrected_*.json")):
+    for path in sorted(DEFAULT_MANIFEST.glob("scpr_corrected_2*.json")):     # the default product only
         info = json.loads(path.read_text())
         # Re-correct when the table or the model weighting behind a day's correction changed.
         if info.get("table_version") != version or info.get("drift_model_version") != sc.DRIFT_MODEL_VERSION:
@@ -253,7 +256,8 @@ def cmd_update(args: argparse.Namespace) -> None:
         print(f"Correcting {len(redo)} day(s) with table {version}")
         for day in redo:
             try:
-                cmd_day(argparse.Namespace(date=day, end=None, method="fit", reconvert=False, workers=1))
+                cmd_day(argparse.Namespace(date=day, end=None, method="fit", offsets="glenn",
+                                           reconvert=False, workers=1))
             except (OSError, ValueError) as exc:     # e.g. yesterday not timestamped; keep going
                 print(f"{day}: {exc}")
                 failed.append(day)
@@ -281,6 +285,10 @@ def main() -> None:
     p.add_argument("--end", type=date.fromisoformat, help="Last day of a range (inclusive)")
     p.add_argument("--method", choices=("fit", "linear"), default="fit",
                    help="Drift curve: fit (default) or linear interpolation between calibrations")
+    p.add_argument("--offsets", choices=("glenn", "masked"), default="glenn",
+                   help="Calibration averaging: glenn (default; Sasagawa et al. 2016) or masked (skips the "
+                        "spin-up and removes logged re-spins, as OOI does); masked is written to "
+                        "output/mseed_corrected_masked")
     p.add_argument("--reconvert", action="store_true", help="Convert again even if MiniSEED exists")
     p.add_argument("--workers", type=int, default=1,
                    help="Days processed in parallel (e.g. 4 for a backfill; each downloads ~22 MB/day)")

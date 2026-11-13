@@ -105,6 +105,7 @@ record. Output (SDS layout, one file per channel-day):
 |---|---|
 | `output/mseed/YEAR/OO/AXCC1/CHA.D/OO.AXCC1.LOC.CHA.D.YEAR.DOY` | raw, all channels, quality `D` |
 | `output/mseed_corrected/...` | drift-corrected `LDO` (loc 40 and 41), quality `Q` |
+| `output/mseed_corrected_masked/...` | the same with the masked calibration averaging (`--offsets masked`) |
 | `output/manifest/scpr_mseed_DATE.json` | inputs (with checksums), timing, per-stream statistics |
 | `output/manifest/scpr_corrected_DATE.json` | calibration table version, drift, uncertainty, provisional flag |
 
@@ -113,6 +114,9 @@ record. Output (SDS layout, one file per channel-day):
 * **Not corrected:** once the drift uncertainty exceeds 100 Pa (about 200 days after the last
   calibration) the day is converted but not corrected.
 * `--method linear` interpolates the drift between calibrations instead of using the fitted curve.
+* `--offsets masked` uses the second calibration averaging (see
+  [Calibration offset](#calibration-offset-per-event-per-gauge)) and writes to
+  `output/mseed_corrected_masked/`.
 
 ## Data source
 
@@ -176,34 +180,89 @@ U0/Y1–Y3 per gauge. The gauge coefficients are unchanged since July 2018.
 
 ### Periods without timestamps
 
-piweb logged some periods **without `<log-ts>` stamps**: **2024-04-11 19:22 → 2024-04-17 16:19
-UTC** and **2026-10-17 20:56 → 2026-11-13 20:15 UTC** (logger fixed by OOI). In both cases the
-data stream dropped out (5 min / 2.9 h) and the logger came back without timestamps; the
-instrument itself was unaffected. On 2026-11-13 the measured clock offset was −80.32 s against
-about −80.0 s predicted from before the gap. Such records are **re-timed** (`scpr_retime.py`) and every re-timed day is
-labelled in its manifest (`timing_reconstructed`: method, clock offset, per-run anchors, checks):
+piweb logged some data **without `<log-ts>` stamps**, so there is no arrival time to use:
 
-* **Auxiliary (SCPR) records** carry the instrument clock (UNIX_SEC), which ran without resets
-  through both gaps. Its offset from UTC is a straight line between clock resets
-  (−0.555 s/day in 2026) and is predicted from the nearest timestamped days — interpolated once
-  stamps resume. Prediction error on timestamped days: median 0.01 s.
-* **Gauge records** (no clock of their own): one per second from the start of the day's file
-  (+0.5 s); outages are taken from the instrument clock; whole seconds are corrected by the clock
-  only when it disagrees by more than 1.5 s (the logger switched files 3 s late on 2026-10-19).
-  Records in restart files (e.g. `_T2056`) are anchored on the clock.
-* Only runs where the gauge and SCPR streams agree (line counts within 1, clock gaps ≤ 5 s) are
-  re-timed; others are reported and not converted (e.g. 2026-11-08).
-* `LCE` is not written for re-timed records (it would only echo the predicted offset).
-* **Validation** (stamps removed from timestamped days, compared with the normal timing):
-  179 days — gauges 97.6 % of gauge-days with every sample within 0.75 s, auxiliary channels
-  95.3 %; end-to-end through the converter on 20 days — every sample within 0.75 s on all 18
-  accepted days (worst 0.5 s), the 2 outage days correctly refused.
+| Period (UTC) | What happened |
+|---|---|
+| **2024-04-11 19:22 → 2024-04-17 16:19** | 5-min stream dropout; the logger came back without timestamps |
+| **2026-10-17 20:56 → 2026-11-13 20:15** | 2.9-h dropout (18:04 → 20:56); the logger came back without timestamps until OOI fixed it |
+| seconds to minutes on 9 other days (2018-07-06, 2021-06-30, 2022-09-08, 2023-11-03, 2023-12-21, 2024-01-30, 2024-02-05, 2024-02-16, 2025-05-02) | lines flushed from the terminal server's buffer at the start of a restart file (e.g. `_T1933`), before stamping resumed |
 
-**For data users:** re-timed data in these two periods is distributed like any other data, with
-no separate quality flag in the MiniSEED or StationXML; its times are accurate to about 0.75 s
-(see validation above). Use these periods with that in mind for anything timing-critical, and
-note that `LCE` is absent there. If OOI can re-export these periods with real timestamps, those
-replace the reconstruction.
+The instrument itself was unaffected, and these records are **re-timed** by `scpr_retime.py`
+from what the data itself carries. Every re-timed day says so in its manifest
+(`timing_reconstructed`: clock offset and how it was obtained, every run with its anchors, checks
+and result, records re-timed and records left out).
+
+**1. The instrument clock.** Every SCPR (auxiliary) record carries the instrument's own clock,
+`UNIX_SEC`. Its offset from UTC (clock − arrival time) changes along a straight line between clock
+resets (−0.555 s/day in 2026). For a day without stamps the offset is predicted from the daily
+offsets (in the manifests) of the 30 nearest timestamped days on each side: **interpolated** when
+there are stamps on both sides of the gap, extrapolated otherwise. On a partly stamped day it is
+measured from that day's stamps. Prediction error on timestamped days: median 0.01 s. Check at the
+end of the 27-day 2026 gap: −80.06 s extrapolated from before the gap, −80.32 s measured when the
+stamps came back (0.26 s, i.e. ≤ 0.01 s/day).
+
+**2. Auxiliary channels** (`LE3`–`LE9`, `LDI`, `LKI`, `LAX`, `LAY`, `LEF`): time = instrument clock −
+offset, record by record, including across outages.
+
+**3. Gauge channels** (`LDO`, `LE1`, `LE2`, `LK1`): the gauges have no clock, but write exactly one
+line per second. Their lines are counted from an anchor:
+
+| Anchor | Value | Used when |
+|---|---|---|
+| start of a midnight file | 00:00:00.5 (the first line arrives within the first second) | the day's file starts without stamps |
+| next midnight | 23:59:59.5 | the run continues to the end of the day's last file |
+| the gauge's own first real stamp after the run | that stamp − 1 s | stamps resume and the SCPR clock runs straight into its first stamped record (no outage in between) |
+| the instrument clock | SCPR clock time of the run's first record | a restart file (e.g. `_T2056`) with no stamps after it |
+
+A midnight anchor is moved by whole seconds when the instrument clock shows the logger switched
+files more than 1.5 s early or late (−3 s on 2026-10-19, −4 s at the end of 2026-10-18); a file
+that, by the clock, ended more than 10 s before midnight gets no end anchor. Short outages
+(≤ 5 s) are placed where the instrument clock shows them.
+
+**4. Cases and checks.** A run of gauge lines is re-timed only if it passes:
+
+| Case | Timing | Check |
+|---|---|---|
+| no outage, midnight start (most days) | counted forward from the start anchor | lands within **1.5 s** of the end anchor, if there is one; else line count within 1 of the SCPR records |
+| stamps resume during the day (2024-04-17, 2026-11-13) | counted forward from midnight | lands within 1.5 s of the gauge's first real stamp (2024-04-17: +0.20 / +0.26 s; 2026-11-13: −0.23 / −0.53 s) |
+| restart-file buffer before stamps resume (7 of the 9 short cases) | counted **back** from the gauge's own first real stamp; each port reconnects at its own moment, so the SCPR clock is not used for gauge lines here (it was 105 s off on 2023-11-03) | SCPR clock continuous into the stamps |
+| one outage > 5 s inside a midnight-start run (2026-11-08) | lines before the outage counted forward from the start anchor, lines after it counted back from the end anchor; the SCPR clock gives where it starts. Each stream drops at the outage but reconnects at its own time (2026-11-08: SCPR 27 s, PARO1 29 s, PARO2 130 s); 10 lines each side of the break are left out | the gauge outage comes out ≥ 0 s |
+| more than one outage, or an outage in a restart file | — | not re-timed (2018-07-06 deployment day: 34 min of gauge data; 2022-09-08: 5 min) |
+
+On top of that, **PARO1 and PARO2 must line up**: both gauges record the same seafloor pressure
+noise (microseisms), so the cross-correlation of the two re-timed series must peak at lag 0
+(± 1 s) in every 30-min window where it is clear (correlation ≥ 0.3). On 2026-11-08 all 48
+windows peak at 0. In 2024 the gauges' output steps (~23 Pa) were coarser than the noise, so the
+check is inconclusive there and the anchors carry the timing alone. It checks the gauges against
+each other only, not their absolute time.
+
+**5. Result.** All untimestamped days are converted. Left out: the 20 lines at the 2026-11-08
+outage, 1–4 lines at the 2026-10-17/10-19 file switches, and the gauge lines on 2018-07-06 and
+2022-09-08 above. `LCE` is not written for re-timed records (it would only echo the predicted
+offset).
+
+**6. Validation.** Stamps were removed from 186 timestamped days (2019–2026) — for the whole day,
+and separately only up to a random time between 04:00 and 20:00 (stamps resuming during the day)
+— and every re-timed line was compared with its normal time:
+
+| | Stamps removed all day | Stamps removed until mid-day |
+|---|---|---|
+| Gauge day-runs re-timed / refused | 353 / 17 | 360 / 12 |
+| … with **every** sample within 0.75 s | 343 (97.2 %) | 352 (97.8 %) |
+| … with ≥ 99 % of samples within 0.75 s | 347 (98.3 %) | 358 (99.4 %) |
+| Runs split around an outage, every sample within 0.75 s | 8 / 8 | 4 / 4 |
+| Auxiliary (SCPR) days with every sample within 0.75 s | 173 / 184 (94.0 %) | 180 / 186 (96.8 %) |
+
+The misses are a few 2021–2022 days on which the arrival stamps themselves jumped (up to 22 s on
+2021-05-06, 0.03 % of samples) or the clock offset was irregular; the actual gaps (2024-04 and
+2026-10/11) fall in periods where the clock offset is a clean straight line.
+
+**For data users:** re-timed data is distributed like any other data, with no separate quality
+flag in the MiniSEED or StationXML; its times are accurate to about 0.75 s (≤ 0.3 s for the
+2026 gap, from the check in 1). Keep that in mind for anything timing-critical, and note that
+`LCE` is absent there. If OOI can re-export these periods with real timestamps, those replace the
+reconstruction.
 
 ## Calibration and drift correction
 
@@ -241,9 +300,26 @@ status). The MiniSEED-based offsets agree with the stand-alone `.dat` pipeline t
 the coverage rules are `failed` (2018-09-21, jittery data). Deployment-day events (2018-07-06)
 are excluded from the drift fit.
 
-A second, reference-only offset (`offset2_pa`, `--offsets masked`) masks the controller-logged
-re-spins and charge-valve operations and skips the first 300 s of settling. It is kept for
-comparison; the published products use the method above.
+**Two averaging methods are kept.** Every event in the table has both:
+
+| | `offset_pa` — **glenn** (default) | `offset2_pa` — **masked** |
+|---|---|---|
+| Source | Sasagawa et al. (2016), Glenn Sasagawa's extraction | the SCPR team's practice (email from Matt, Nov 2026): drop the first 1–3 min after spin-up, when the bell can wobble or stick, and remove re-spin spikes |
+| Window | 1200 s from the pressure minimum | from t0 + 300 s to 60 s before "Exiting: SV to Sea" (at most t0 + 1500 s) |
+| Re-spins etc. | reduced by the 1σ trim in each bin | logged re-spins, spin-motor, belt and valve operations masked (5 s before to 60 s after) |
+| Bin value | 1σ-trimmed mean | median, bins weighted by samples kept |
+| Drift fit rms since 2019 | 44 / 33 Pa | 37 / 29 Pa |
+
+Both drift-corrected products can be made side by side; the masked one goes to its own folder
+and never overwrites the default:
+
+```bash
+python scpr.py day 2020-05-04                    # glenn  -> output/mseed_corrected/
+python scpr.py day 2020-05-04 --offsets masked   # masked -> output/mseed_corrected_masked/
+```
+
+The two differ mostly by a constant (each is relative to its own first calibration; e.g. 63 /
+78 Pa on 2020-05-05). The daily update and the committed `drift_model.json` use the default.
 
 ### Drift model
 
@@ -327,7 +403,7 @@ All scripts are in `SCPR-data-collection/bin/`; `--help` lists every option.
 
 | Command | What it does |
 |---|---|
-| `scpr.py day DATE [--end DATE] [--workers N] [--method fit\|linear] [--reconvert]` | download, convert, drift-correct |
+| `scpr.py day DATE [--end DATE] [--workers N] [--method fit\|linear] [--offsets glenn\|masked] [--reconvert]` | download, convert, drift-correct |
 | `scpr.py build [--start] [--end]` | build the calibration record from piweb |
 | `scpr.py update [--no-yesterday] [--git-push]` | daily incremental update |
 | `scpr_mseed.py --date DATE [--download] [--raw-dir DIR]` | convert one day only |
@@ -365,8 +441,9 @@ psi, temperatures in °C. Data goes to `SCPR-data-collection/sample_data/DATE/`.
 ## Known issues and open questions
 
 * **Timestamps were missing 2026-10-17 20:56 → 2026-11-13 20:15 UTC** on piweb (logger issue,
-  fixed by OOI). That period and 2024-04-11 → 04-17 are re-timed to about 0.75 s (see
-  [Timing](#periods-without-timestamps)).
+  fixed by OOI). That period, 2024-04-11 → 04-17 and short restart fragments on 9 other days
+  are re-timed to about 0.75 s (see [Timing](#periods-without-timestamps)); 34 min of gauge data
+  on the deployment day (2018-07-06) and 5 min on 2022-09-08 cannot be re-timed.
 * **No calibration since 2026-02-05**: data after about 2026-08-21 is converted but not
   drift-corrected (uncertainty > 100 Pa).
 * **LVDT coefficients** (a = 1.222 mm/V, b = 0.25 V for both LVDTs) come from Glenn Sasagawa's
