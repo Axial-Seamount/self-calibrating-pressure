@@ -19,6 +19,7 @@ Exit status 1 if anything FAILs (WARN does not fail).
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import date
 import math
 from pathlib import Path
@@ -130,6 +131,10 @@ def main() -> None:
             continue
         missing_meta = sorted(set(written) - set(channels))
         no_data = sorted(set(channels) - set(written))
+        manifest = paths.MANIFEST / f"scpr_mseed_{day}.json"
+        if ("40", "LCE") in no_data and manifest.exists() and "timing_reconstructed" in json.loads(manifest.read_text()):
+            no_data.remove(("40", "LCE"))           # re-timed day: no arrival stamps, so no LCE by design
+            report("OK", f"{d}: re-timed day (no timestamps on piweb); LCE absent by design")
         report("FAIL" if missing_meta else "OK", f"{d}: channels with data but no metadata: {missing_meta or 'none'}")
         report("FAIL" if no_data else "OK", f"{d}: channels in metadata without data: {no_data or 'none'}")
         for key, st in written.items():
