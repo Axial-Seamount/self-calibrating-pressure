@@ -1,0 +1,15 @@
+.DS_Store
+__pycache__/
+*.part
+~$*
+
+# Generated data (large; regenerate with scpr.py, or kept on the COSZO RAID).
+# StationXML in output/xml is part of the repo.
+SCPR-data-collection/output/*
+!SCPR-data-collection/output/xml/
+
+# Local-only material (not for this public repo): third-party documents, the COSZO
+# team channel spreadsheet, and the step 1-2 sample data.
+SCPR-data-collection/docs/
+SCPR-data-collection/param/
+SCPR-data-collection/sample_data/

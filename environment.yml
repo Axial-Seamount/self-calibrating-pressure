@@ -1,0 +1,11 @@
+# Conda environment for the SCPR pipeline (scpr.py and friends).
+#   conda env create -f environment.yml && conda activate scpr
+# Versions are the ones the pipeline was developed and validated with (2026-11).
+name: scpr
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy=2.4
+  - obspy=1.5
+  - matplotlib=3.10
