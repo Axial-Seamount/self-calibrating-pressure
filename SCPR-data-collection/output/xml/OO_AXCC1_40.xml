@@ -3,7 +3,7 @@
   <Source>COSZO</Source>
   <Module>ObsPy 1.5.0</Module>
   <ModuleURI>https://www.obspy.org</ModuleURI>
-  <Created>2026-11-13T17:26:07.585445Z</Created>
+  <Created>2026-11-13T19:57:24.131676Z</Created>
   <Network code="OO" startDate="2014-01-01T00:00:00.000000Z" restrictedStatus="open">
     <Description>Ocean Observatories Initiative</Description>
     <Station code="AXCC1" startDate="2014-07-25T21:05:00.000000Z" restrictedStatus="open">
@@ -15,9 +15,9 @@
       </Site>
       <Channel code="LDO" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Pressure 1</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -66,9 +66,9 @@
       </Channel>
       <Channel code="LE1" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Pressure 1 pressure period</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -117,9 +117,9 @@
       </Channel>
       <Channel code="LE2" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Pressure 1 temperature period</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -171,9 +171,9 @@
         <Comment>
           <Value>LVDT is powered only during calibrations (LEF = 1). Outside calibrations the LVDTs are off (recording mode 6) and read below 0.1 V; those values are not piston height.</Value>
         </Comment>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -222,9 +222,9 @@
       </Channel>
       <Channel code="LE4" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Raw internal barometric pressure</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -273,9 +273,9 @@
       </Channel>
       <Channel code="LE5" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Raw temperature of SCPR mounting post</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -324,9 +324,9 @@
       </Channel>
       <Channel code="LE6" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>RPM of piston</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -375,9 +375,9 @@
       </Channel>
       <Channel code="LE7" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Raw x-axis tilt</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -426,9 +426,9 @@
       </Channel>
       <Channel code="LE8" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Raw y-axis tilt</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -480,9 +480,9 @@
         <Comment>
           <Value>LVDT is powered only during calibrations (LEF = 1). Outside calibrations the LVDTs are off (recording mode 6) and values are not piston height.</Value>
         </Comment>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -531,9 +531,9 @@
       </Channel>
       <Channel code="LDI" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Calculated internal pressure</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -582,9 +582,9 @@
       </Channel>
       <Channel code="LKI" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Calculated mounting post temperature</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -633,9 +633,9 @@
       </Channel>
       <Channel code="LAX" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Calculated x-axis tilt</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -684,9 +684,9 @@
       </Channel>
       <Channel code="LAY" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Calculated y-axis tilt</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -735,9 +735,9 @@
       </Channel>
       <Channel code="LK1" startDate="2018-07-06T07:00:00.000000Z" locationCode="40">
         <Description>Calculated pressure 1 temperature</Description>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>
@@ -789,9 +789,9 @@
         <Comment>
           <Value>SCPR system clock (whole Unix seconds) minus OOI data-center arrival timestamp, median per minute. Includes network latency; not a GPS clock phase error. Resolution 1 s.</Value>
         </Comment>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>0.016666666666666666</SampleRate>
         <Sensor>
@@ -843,9 +843,9 @@
         <Comment>
           <Value>0 = gauges open to seawater; 1 = selector valve on the dead-weight tester (SCPR log 'Switching SV to DWT', or 'Starting Calibration Run' if absent, through 'Exiting: SV to Sea').</Value>
         </Comment>
-        <Latitude unit="DEGREES">45.954907</Latitude>
-        <Longitude unit="DEGREES">-130.00928</Longitude>
-        <Elevation unit="METERS">-1525.0</Elevation>
+        <Latitude unit="DEGREES">45.9548288</Latitude>
+        <Longitude unit="DEGREES">-130.00924</Longitude>
+        <Elevation unit="METERS">-1530.1</Elevation>
         <Depth unit="METERS">0.0</Depth>
         <SampleRate>1.0</SampleRate>
         <Sensor>

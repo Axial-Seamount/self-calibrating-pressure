@@ -131,8 +131,8 @@ data system, then the instrument output.
 
 ## Output channels
 
-Network `OO`, station `AXCC1` (the existing EarthScope station; the SCPR sits 34 m from the
-station point and carries its own channel coordinates: 45.954907 N, 130.00928 W, 1525 m).
+Network `OO`, station `AXCC1` (the existing EarthScope station; the SCPR sits 26 m from the
+station point and carries its own channel coordinates: 45.9548288 N, 130.0092400 W, −1530.1 m).
 
 | Loc | Channel | Content | Unit | Rate |
 |---|---|---|---|---|
