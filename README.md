@@ -141,7 +141,7 @@ station point and carries its own channel coordinates: 45.954907 N, 130.00928 W,
 | 40 / 41 | `LE2` | gauge temperature period | s | 1 Hz |
 | 40 / 41 | `LK1` | gauge temperature | C | 1 Hz |
 | 40 / 41 | `LE3` | LVDT1 / LVDT2 voltage (piston height; powered only during calibrations) | V | 1 Hz |
-| 40 / 41 | `LE9` | LVDT1 / LVDT2 piston height — **not produced yet** (coefficients unknown) | m | 1 Hz |
+| 40 / 41 | `LE9` | LVDT1 / LVDT2 piston height, 1.222 mm/V · (V − 0.25 V) (meaningful only during calibrations) | m | 1 Hz |
 | 40 | `LDI` | internal barometer (Vaisala PTB110) | Pa | 1 Hz |
 | 40 | `LKI` | PRT temperature (dead-weight tester) | C | 1 Hz |
 | 40 | `LAX`, `LAY` | tilt X, Y | degree | 1 Hz |
@@ -202,7 +202,7 @@ If OOI can re-export these periods with real timestamps, those replace the recon
 ### The instrument
 
 Every 2–8 months the controller switches both gauges from seawater to an internal dead-weight
-tester (DWT; piston-cylinder with a 6.6344 kg mass bell) that generates a known pressure,
+tester (DWT; piston-cylinder PC-7300-2 SN 1466 with a 6.6344 kg mass bell) that generates a known pressure,
 referenced to the air pressure inside the housing (internal barometer). A gauge's reading of that
 known pressure, compared between calibrations, measures its drift.
 
@@ -301,14 +301,13 @@ channel spreadsheet (not in this repository):
 
 ```bash
 python create_coszo_metadata.py --metadata "../param/COSZO Instrument Data Channels.xlsx" \
-    --station-name AXCC1 --location-code 40 --exclude-channels LE9 --output ../output/xml   # and 41
+    --station-name AXCC1 --location-code 40 --output ../output/xml   # and 41
 python check_metadata.py          # always
 ```
 
 * The **station** element is identical to EarthScope's existing AXCC1 (start 2014-07-25,
   45.954683 N, 130.008979 W, −1527 m, "RSN Axial Central Caldera 1"); the SCPR channels carry
   their own position and start (2018-07-06).
-* `LE9` is excluded until the LVDT coefficients are known (it would be a channel without data).
 * **The spreadsheet can be wrong**, so `check_metadata.py` tests the XML against sources that are
   not the spreadsheet: the units the converter writes (`scpr_mseed.CHANNEL_UNITS`), the MiniSEED
   on disk (same channels, rates, epochs), EarthScope's live station record, and FDSN conventions
@@ -361,9 +360,9 @@ psi, temperatures in °C. Data goes to `SCPR-data-collection/sample_data/DATE/`.
   re-timed (see [Timing](#periods-without-timestamps)); the logger needs fixing at the source.
 * **No calibration since 2026-02-05**: data after about 2026-08-21 is converted but not
   drift-corrected (uncertainty > 100 Pa).
-* **LVDT coefficients** (a in mm/V, b in V for LVDT1 and LVDT2) are not in the instrument
-  documentation; `LE9` waits for them. Adding them later only needs a re-conversion from the raw
-  files.
+* **LVDT coefficients** (a = 1.222 mm/V, b = 0.25 V for both LVDTs) come from Glenn Sasagawa's
+  processing and will be re-checked after the 2027 recovery. Days converted before converter
+  version 4 have no `LE9`; `scpr.py day START --end END --reconvert` adds it from the raw files.
 * The documented DWT mass and piston area (6.6344 kg, 4.9034 mm²) do not reproduce the measured
   calibration pressure (~15 269 kPa); this does not affect the drift, which uses differences.
 * The internal barometer reading fell 0.29 kPa from 2018 to 2026 (mostly in 2018); housing

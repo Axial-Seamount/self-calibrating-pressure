@@ -3,7 +3,7 @@
   <Source>COSZO</Source>
   <Module>ObsPy 1.5.0</Module>
   <ModuleURI>https://www.obspy.org</ModuleURI>
-  <Created>2026-11-13T01:26:07.645209Z</Created>
+  <Created>2026-11-13T17:26:08.172850Z</Created>
   <Network code="OO" startDate="2014-01-01T00:00:00.000000Z" restrictedStatus="open">
     <Description>Ocean Observatories Initiative</Description>
     <Station code="AXCC1" startDate="2014-07-25T21:05:00.000000Z" restrictedStatus="open">
@@ -201,6 +201,60 @@
               <OutputUnits>
                 <Name>V</Name>
                 <Description>volt</Description>
+              </OutputUnits>
+              <PzTransferFunctionType>DIGITAL (Z-TRANSFORM)</PzTransferFunctionType>
+              <NormalizationFactor>1.0</NormalizationFactor>
+              <NormalizationFrequency unit="HERTZ">1.0</NormalizationFrequency>
+            </PolesZeros>
+            <Decimation>
+              <InputSampleRate unit="HERTZ">1.0</InputSampleRate>
+              <Factor>1</Factor>
+              <Offset>0</Offset>
+              <Delay unit="HERTZ">0.0</Delay>
+              <Correction unit="HERTZ">0.0</Correction>
+            </Decimation>
+            <StageGain>
+              <Value>1.0</Value>
+              <Frequency>1</Frequency>
+            </StageGain>
+          </Stage>
+        </Response>
+      </Channel>
+      <Channel code="LE9" startDate="2018-07-06T07:00:00.000000Z" locationCode="41">
+        <Description>Calculated piston height, position sensor 2 (LVDT2)</Description>
+        <Comment>
+          <Value>LVDT is powered only during calibrations (LEF = 1). Outside calibrations the LVDTs are off (recording mode 6) and values are not piston height.</Value>
+        </Comment>
+        <Latitude unit="DEGREES">45.954907</Latitude>
+        <Longitude unit="DEGREES">-130.00928</Longitude>
+        <Elevation unit="METERS">-1525.0</Elevation>
+        <Depth unit="METERS">0.0</Depth>
+        <SampleRate>1.0</SampleRate>
+        <Sensor>
+          <Description>Calibrated Pressure - Self-Calibrating Pressure Recorder</Description>
+        </Sensor>
+        <Response>
+          <InstrumentSensitivity>
+            <Value>1.0</Value>
+            <Frequency>1</Frequency>
+            <InputUnits>
+              <Name>m</Name>
+              <Description>meter</Description>
+            </InputUnits>
+            <OutputUnits>
+              <Name>m</Name>
+              <Description>meter</Description>
+            </OutputUnits>
+          </InstrumentSensitivity>
+          <Stage number="1">
+            <PolesZeros name="Stage01">
+              <InputUnits>
+                <Name>m</Name>
+                <Description>meter</Description>
+              </InputUnits>
+              <OutputUnits>
+                <Name>m</Name>
+                <Description>meter</Description>
               </OutputUnits>
               <PzTransferFunctionType>DIGITAL (Z-TRANSFORM)</PzTransferFunctionType>
               <NormalizationFactor>1.0</NormalizationFactor>

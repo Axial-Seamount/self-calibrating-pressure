@@ -114,10 +114,10 @@ def convert_payload(channel: str, payload: str) -> list[float | int] | None:
         lvdt1, lvdt2, baro, prt, rpm, xtilt, ytilt = finite_numbers(parts[2:])
     except ValueError:
         return None
-    # Readme - Cabled SCPR Data files.docx; LVDT coefficients are unspecified.
+    # Readme - Cabled SCPR Data files.docx; LVDT a (mm/V) and b (V) from Glenn Sasagawa.
     return [system_unix, (23.9836 * baro + 49.7607) / KPA_PER_PSI,
             1000.0 * prt - 245.8, rpm, 10.377 * (xtilt - 2.479),
-            10.312 * (ytilt - 2.551), lvdt1, lvdt2]
+            10.312 * (ytilt - 2.551), 1.222 * (lvdt1 - 0.25), 1.222 * (lvdt2 - 0.25)]
 
 
 def write_header(handle, channel: str, day: date, sources: list[dict]) -> None:
@@ -139,10 +139,11 @@ def write_header(handle, channel: str, day: date, sources: list[dict]) -> None:
         handle.write("# barometer_psi=(23.9836*Vbaro+49.7607)/6.894757293168361\n")
         handle.write("# prt_temperature_degC=1000*Vprt-245.8\n")
         handle.write("# tilt_x_deg=10.377*(Vx-2.479); tilt_y_deg=10.312*(Vy-2.551)\n")
-        handle.write("# LVDT retained in V: supplied Readme gives no numerical mm/V scale or offset.\n")
-        handle.write("# LVDT may be powered off (<0.1 V). system_unix_s is the drifting instrument clock.\n")
+        handle.write("# lvdt1_mm=1.222*(V1-0.25); lvdt2_mm=1.222*(V2-0.25) (piston height)\n")
+        handle.write("# LVDTs are powered only during calibrations; otherwise (<0.1 V) not piston height.\n")
+        handle.write("# system_unix_s is the drifting instrument clock.\n")
         columns = ("time_utc system_unix_s barometer_psi prt_temperature_degC "
-                   "rotation_rpm tilt_x_deg tilt_y_deg lvdt1_V lvdt2_V")
+                   "rotation_rpm tilt_x_deg tilt_y_deg lvdt1_mm lvdt2_mm")
     handle.write("# " + "\t".join(columns.split()) + "\n")
 
 

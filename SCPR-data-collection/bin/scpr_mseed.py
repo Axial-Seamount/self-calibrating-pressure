@@ -60,7 +60,7 @@ READBACK_TOL_SAMPLES = 0.51
 # the times written; samples stay within 0.75 s of their (arrival-time) stamps.
 SEGMENT_TOL = 0.75
 # Bump when the conversion changes: scpr.py then re-converts days made by an older version.
-CONVERTER_VERSION = 3
+CONVERTER_VERSION = 4   # 4: LE9 piston height (LVDT coefficients)
 DEFAULT_MSEED = paths.MSEED
 DEFAULT_MANIFEST = paths.MANIFEST
 LOG_LINE = re.compile(r"^<log-ts:([^>]+)>\s?(.*)$")
@@ -70,9 +70,10 @@ EPOCH = np.datetime64("1970-01-01T00:00:00", "us")
 BARO_KPA_PER_V, BARO_OFFSET_KPA = 23.9836, 49.7607      # P = a*V + b
 PRT_DEGC_PER_V, PRT_OFFSET_DEGC = 1000.0, 245.8         # T = a*V - b
 TILT = {"X": (10.377, 2.479), "Y": (10.312, 2.551)}     # deg = a*(V - b)
-# LVDT piston height: Z[mm] = a*(V - b). The readme omits a and b (requested from
-# Glenn Sasagawa); LE9 is skipped until they are filled in as {1: (a, b), 2: (a, b)}.
-LVDT: dict[int, tuple[float, float] | None] = {1: None, 2: None}
+# LVDT piston height: Z[mm] = a*(V - b), a = sensitivity (mm/V), b = null (V output at
+# 0 mm). Values from Glenn Sasagawa (Nov 2026; his processing uses lvdt*_sens = 1.222,
+# lvdt*_null = 0.25); to be re-checked after the 2027 recovery. None skips LE9.
+LVDT: dict[int, tuple[float, float] | None] = {1: (1.222, 0.25), 2: (1.222, 0.25)}
 
 # LEF calibration flag: 1 from the selector valve switching to the dead-weight
 # tester until it switches back to seawater. "Starting Calibration Run" follows

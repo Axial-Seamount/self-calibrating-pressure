@@ -22,7 +22,7 @@ Requirements: COSZO Instrument Data Channels.xlsx
 
 Example usage:
 
-python create_coszo_metadata.py --metadata "../param/COSZO Instrument Data Channels.xlsx" --output ../output/xml --station-name AXCC1 --location-code 40 --exclude-channels LE9
+python create_coszo_metadata.py --metadata "../param/COSZO Instrument Data Channels.xlsx" --output ../output/xml --station-name AXCC1 --location-code 40
 (the spreadsheet is the COSZO team's channel table; it is not part of this public repository)
 '''
 
@@ -34,7 +34,7 @@ parser.add_argument(
     '--exclude-channels',
     nargs='*',
     default=[],
-    help='Channel codes to leave out, e.g. channels without data yet (AXCC1: LE9 until the LVDT coefficients are known)'
+    help='Channel codes to leave out, e.g. channels without data yet'
 )
 parser.add_argument(
     '--output',
