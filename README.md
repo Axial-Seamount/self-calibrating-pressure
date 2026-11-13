@@ -5,9 +5,10 @@ caldera (OOI RSN, reference designator `SCPRAA301`) into MiniSEED for **OO.AXCC1
 corrects its two Paroscientific pressure gauges for long-term drift using the instrument's
 own in-situ calibrations against a dead-weight tester.
 
-* **Raw MiniSEED** (data quality `D`): all 21 SCPR channels, location codes 40 and 41.
+* **Raw MiniSEED** (data quality `D`): all 23 SCPR channels, location codes 40 and 41. This,
+  with the StationXML, is what goes to EarthScope.
 * **Drift-corrected pressure** (data quality `Q`): `LDO` for both gauges, with a per-day drift
-  uncertainty.
+  uncertainty. A product users make with this repository; it is **not** sent to EarthScope.
 * **StationXML** for the new channels, checked against EarthScope and the data.
 * **Calibration record** (`SCPR-data-collection/calibration/`): every calibration since
   deployment (2018-07-06), the drift model and its plot. It ships with the code, so correcting
@@ -132,7 +133,9 @@ data system, then the instrument output.
 ## Output channels
 
 Network `OO`, station `AXCC1` (the existing EarthScope station; the SCPR sits 26 m from the
-station point and carries its own channel coordinates: 45.9548288 N, 130.0092400 W, −1530.1 m).
+station point and carries its own channel coordinates: 45.9548288 N, 130.0092400 W, −1530.1 m,
+from OOI's Regional Cabled Array; Glenn Sasagawa's FAQ gives 45.954907 N, 130.00928 W, 1525 m,
+9 m away, which is not used).
 
 | Loc | Channel | Content | Unit | Rate |
 |---|---|---|---|---|
@@ -174,9 +177,10 @@ U0/Y1–Y3 per gauge. The gauge coefficients are unchanged since July 2018.
 ### Periods without timestamps
 
 piweb logged some periods **without `<log-ts>` stamps**: **2024-04-11 19:22 → 2024-04-17 16:19
-UTC** and **2026-10-17 20:56 UTC → (ongoing in November 2026)**. In both cases the data stream
-dropped out (5 min / 2.9 h) and the logger came back without timestamps; the instrument itself
-was unaffected. Such records are **re-timed** (`scpr_retime.py`) and every re-timed day is
+UTC** and **2026-10-17 20:56 → 2026-11-13 20:15 UTC** (logger fixed by OOI). In both cases the
+data stream dropped out (5 min / 2.9 h) and the logger came back without timestamps; the
+instrument itself was unaffected. On 2026-11-13 the measured clock offset was −80.32 s against
+about −80.0 s predicted from before the gap. Such records are **re-timed** (`scpr_retime.py`) and every re-timed day is
 labelled in its manifest (`timing_reconstructed`: method, clock offset, per-run anchors, checks):
 
 * **Auxiliary (SCPR) records** carry the instrument clock (UNIX_SEC), which ran without resets
@@ -195,7 +199,11 @@ labelled in its manifest (`timing_reconstructed`: method, clock offset, per-run 
   95.3 %; end-to-end through the converter on 20 days — every sample within 0.75 s on all 18
   accepted days (worst 0.5 s), the 2 outage days correctly refused.
 
-If OOI can re-export these periods with real timestamps, those replace the reconstruction.
+**For data users:** re-timed data in these two periods is distributed like any other data, with
+no separate quality flag in the MiniSEED or StationXML; its times are accurate to about 0.75 s
+(see validation above). Use these periods with that in mind for anything timing-critical, and
+note that `LCE` is absent there. If OOI can re-export these periods with real timestamps, those
+replace the reconstruction.
 
 ## Calibration and drift correction
 
@@ -356,8 +364,9 @@ psi, temperatures in °C. Data goes to `SCPR-data-collection/sample_data/DATE/`.
 
 ## Known issues and open questions
 
-* **Timestamps missing since 2026-10-17 20:56 UTC** on piweb (logger issue at OOI RSN). Data is
-  re-timed (see [Timing](#periods-without-timestamps)); the logger needs fixing at the source.
+* **Timestamps were missing 2026-10-17 20:56 → 2026-11-13 20:15 UTC** on piweb (logger issue,
+  fixed by OOI). That period and 2024-04-11 → 04-17 are re-timed to about 0.75 s (see
+  [Timing](#periods-without-timestamps)).
 * **No calibration since 2026-02-05**: data after about 2026-08-21 is converted but not
   drift-corrected (uncertainty > 100 Pa).
 * **LVDT coefficients** (a = 1.222 mm/V, b = 0.25 V for both LVDTs) come from Glenn Sasagawa's
