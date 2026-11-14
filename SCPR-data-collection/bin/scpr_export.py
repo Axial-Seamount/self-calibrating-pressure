@@ -153,6 +153,15 @@ COLORS = {"PARO1": "#2a78d6", "PARO2": "#eb6834"}
 INK, INK2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
 
+def label_extrapolated(ax, last_cal, valid, y_frac: float = 0.03, va: str = "bottom") -> None:
+    """Say what the shaded span after the last calibration is, inside it."""
+    import matplotlib.transforms as mtransforms
+    tr = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+    ax.text(last_cal, y_frac, f" after the last\n calibration\n ({str(last_cal)[:10]}):\n drift extrapolated;\n"
+                              f" not corrected\n after {str(valid)[:10]}",
+            transform=tr, color=INK2, fontsize=7, va=va, ha="left", linespacing=1.15)
+
+
 def read_csv(path: Path) -> tuple[np.ndarray, dict, list[str]]:
     lines = path.read_text().splitlines()
     head = [l for l in lines if l.startswith("#")]
@@ -207,9 +216,8 @@ def plot(csv: Path, png: Path) -> Path:
     a1.set_ylabel("Pressure change (kPa)")
     a1.set_title("SCPR seafloor pressure, drift-corrected (daily means; shading = drift uncertainty, 1\u03c3)",
                  loc="left", color=INK, fontsize=10)
-    a1.text(last_cal, a1.get_ylim()[1], "  after the last calibration:\n  drift extrapolated, then not corrected",
-            color=INK2, fontsize=7.5, va="top")
-    a1.legend(loc="upper right", bbox_to_anchor=(0.86, 1.0), frameon=False, fontsize=8, ncol=1)
+    label_extrapolated(a1, last_cal, valid, y_frac=0.97, va="top")
+    a1.legend(loc="upper right", bbox_to_anchor=(0.84, 1.0), frameon=False, fontsize=8, ncol=1)
     for kind, colr, lw, lab in (("raw", INK2, 0.9, "raw"), ("corr", COLORS["PARO1"], 1.2, "drift-corrected")):
         x, d1 = daily(t, c[f"paro1_{kind}_pa"]); _, d2 = daily(t, c[f"paro2_{kind}_pa"])
         dd = (d1 - d2)
@@ -267,6 +275,8 @@ def plot_uplift(csv: Path, png: Path) -> Path:
     fin = np.flatnonzero(np.isfinite(smooth))
     a1.annotate(f"{smooth[fin[-1]] * 100:+.0f} cm", (x[fin[-1]], smooth[fin[-1]]), xytext=(5, 0),
                 textcoords="offset points", va="center", color=INK, fontsize=8.5)
+    valid = np.datetime64(sc.iso_s(models["PARO1"].t_last_valid)[:19])
+    label_extrapolated(a1, last_cal, valid)
     a1.set_ylabel("Uplift since July 2018 (m)")
     a1.set_title("Estimated seafloor uplift at the central caldera, from drift-corrected SCPR pressure",
                  loc="left", color=INK, fontsize=10)
