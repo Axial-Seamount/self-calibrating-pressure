@@ -143,6 +143,7 @@ committed calibration record. For each gauge (`paro1_…` = loc 40, `paro2_…` 
 | `*_raw_pa` | mean gauge pressure as recorded (Pa, absolute) |
 | `*_corr_pa` | mean drift-corrected pressure, default calibration averaging (glenn) |
 | `*_corr_masked_pa` | the same with the masked averaging |
+| `*_uplift_m` | estimated seafloor uplift (m) since the first 30 days of the record (2018-07-06 → 08-04): tides removed from `*_corr_pa` with a Godin 24-24-25 h filter, then −ΔP / (ρg) (see below); empty within ~1.5 days of a data gap |
 | `*_drift_sigma_pa` | 1σ uncertainty of the drift removed |
 | `*_n` | number of 1-Hz samples in the mean |
 
@@ -156,7 +157,7 @@ Two figures are drawn from this file (both shown at the top):
 
 * `scpr_pressure.png` — daily means of the corrected pressure change for both gauges with the
   calibration dates, and the PARO1 − PARO2 difference before and after correction.
-* `scpr_uplift.png` — **estimated seafloor uplift** since July 2018: uplift = −ΔP / (ρg) with the
+* `scpr_uplift.png` — **estimated seafloor uplift** since July 2018 (the `*_uplift_m` columns): uplift = −ΔP / (ρg) with the
   in-situ seawater density at the SCPR (ρ ≈ 1035 kg/m³ at ~1530 m) and g = 9.808 m/s², so
   1 kPa ≈ 9.9 cm; daily means of each gauge, the 30-day mean of both, and the uplift rate
   (slope over a centred 180-day window, cm/yr). Caveats: there is no reference pressure station

@@ -32,6 +32,7 @@ from scpr import calibration_options
 from scpr_mseed import sds_path
 
 FIRST_DAY = date(2018, 7, 6)
+REF_DAYS = 30                                   # uplift zero: mean of the first 30 days
 GAUGES = ("PARO1", "PARO2")
 _STATE: dict = {}
 
@@ -42,6 +43,26 @@ def _models() -> dict:
         _STATE["masked"] = sc.build_models(calibration_options(offsets="masked"), verbose=False)[0]
         _STATE["client"] = Client(str(paths.MSEED))
     return _STATE
+
+
+def godin(x: np.ndarray, interval: int) -> np.ndarray:
+    """Godin tidal filter (running means of 24, 24 and 25 h) on an evenly spaced series;
+    NaN where a window is less than 90 % covered. For daily or longer intervals: unchanged."""
+    if interval >= 86400:
+        return x.copy()
+    steps = [round(h * 3600 / interval) for h in (24, 24, 25)]
+    y = x.astype(float)
+    for w in steps:
+        ok = np.isfinite(y)
+        k = np.ones(w)
+        n = np.convolve(ok.astype(float), k, "same")
+        with np.errstate(invalid="ignore", divide="ignore"):
+            y = np.where(n >= 0.9 * w, np.convolve(np.where(ok, y, 0.0), k, "same") / n, np.nan)
+    return y
+
+
+def _epoch(d: date) -> float:
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc).timestamp()
 
 
 def day_rows(job: tuple[date, int]) -> list[tuple]:
@@ -111,7 +132,22 @@ def export(start: date = FIRST_DAY, end: date | None = None, interval: int = 360
     version = sc.table_version(sc.DEFAULT_TABLE)
     last = {g: sc.iso_s(models["glenn"][g].t[-1]) for g in GAUGES}
     valid = {g: sc.iso_s(models["glenn"][g].t_last_valid) for g in GAUGES}
-    names = ("raw", "corr", "corr_masked", "drift_sigma", "n")
+    # Uplift: tides removed from the corrected pressure (Godin 24-24-25 h filter on the hourly
+    # series), relative to its mean over the first REF_DAYS days of the record (a fixed zero,
+    # whatever --start is), divided by rho*g.
+    rho_g = RHO_SEAFLOOR * G_LOCAL
+    detided, ref = {}, {}
+    for g in GAUGES:
+        corr = np.array([vals[g][1] if g in vals else np.nan for _, vals in rows])
+        detided[g] = godin(corr, args.interval)
+    t0s = np.array([r[0] for r in rows])
+    in_ref = t0s < _epoch(FIRST_DAY + timedelta(days=REF_DAYS))
+    for g in GAUGES:
+        v = detided[g][in_ref]
+        ref[g] = float(np.nanmean(v)) if args.start == FIRST_DAY and np.isfinite(v).any() else np.nan
+    if args.start != FIRST_DAY:
+        print("uplift columns left empty: the reference period needs --start", FIRST_DAY)
+    names = ("raw", "corr", "corr_masked", "uplift", "drift_sigma", "n")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     tmp = args.out.with_suffix(".part")
     written = 0
@@ -122,22 +158,30 @@ def export(start: date = FIRST_DAY, end: date | None = None, interval: int = 360
                  "# *_raw: gauge pressure as recorded. *_corr: raw minus drift, calibration averaging 'glenn'\n"
                  "#   (Sasagawa et al. 2016; default). *_corr_masked: the same with the 'masked' averaging (spin-up\n"
                  "#   skipped, re-spins removed). Both are relative to each gauge's first calibration (2018-07-09).\n"
+                 f"# *_uplift_m: estimated seafloor uplift (m) = -(detided corr - reference) / (rho g), rho = {RHO_SEAFLOOR:.0f} kg/m3,\n"
+                 "#   tides removed with a Godin 24-24-25 h filter (empty within ~1.5 days of a data gap),\n"
+                 f"#   g = {G_LOCAL} m/s2 (1 kPa = {1000 / rho_g * 100:.2f} cm); reference = mean corr of {FIRST_DAY} .. "
+                 f"{FIRST_DAY + timedelta(days=REF_DAYS - 1)}\n"
+                 f"#   (PARO1 {ref['PARO1']:.1f} Pa, PARO2 {ref['PARO2']:.1f} Pa). No reference station: ocean pressure changes remain.\n"
                  "# *_drift_sigma: 1-sigma uncertainty of the drift removed. *_n: 1-Hz samples averaged.\n"
                  f"# Empty corr: drift uncertainty > 100 Pa (corrected until {valid['PARO1'][:10]}); after the last calibration\n"
                  f"#   ({last['PARO1'][:10]}) the drift is extrapolated (provisional).\n"
                  f"# Calibration table {version}; generated {datetime.now(timezone.utc):%Y-%m-%dT%H:%M}Z by scpr_export.py\n")
-        fh.write("time_utc," + ",".join(f"{g.lower()}_{n}_pa" if n != "n" else f"{g.lower()}_n"
-                                        for g in GAUGES for n in names) + "\n")
-        for t0, vals in rows:
+        unit = {"n": "", "uplift": "_m"}
+        fh.write("time_utc," + ",".join(f"{g.lower()}_{n}{unit.get(n, '_pa')}" for g in GAUGES for n in names) + "\n")
+        for i, (t0, vals) in enumerate(rows):
             if not vals:
                 continue
             cells = [datetime.fromtimestamp(t0, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")]
             for g in GAUGES:
                 v = vals.get(g)
                 if v is None:
-                    cells += [""] * 5
+                    cells += [""] * 6
                     continue
-                cells += ["" if not np.isfinite(x) else f"{x:.1f}" for x in v[:4]] + [str(int(v[4]))]
+                up = -(detided[g][i] - ref[g]) / rho_g
+                f1 = lambda x: "" if not np.isfinite(x) else f"{x:.1f}"
+                cells += [f1(v[0]), f1(v[1]), f1(v[2]), "" if not np.isfinite(up) else f"{up:.4f}", f1(v[3]),
+                          str(int(v[4]))]
             fh.write(",".join(cells) + "\n")
             written += 1
     tmp.replace(args.out)
@@ -262,9 +306,7 @@ def plot_uplift(csv: Path, png: Path) -> Path:
                                  facecolor=SURFACE, constrained_layout=True)
     ups = []
     for g in GAUGES:
-        x, p = daily(t, c[f"{g.lower()}_corr_pa"])
-        first = np.flatnonzero(np.isfinite(p))[:30]
-        up = -(p - np.nanmean(p[first])) / rho_g                 # m, relative to the first month
+        x, up = daily(t, c[f"{g.lower()}_uplift_m"])             # m, from the file's uplift column
         ups.append(up)
         a1.plot(x, up, color=COLORS[g], lw=0.7, alpha=0.55, label=f"{g} (daily mean)")
     with np.errstate(invalid="ignore"), __import__("warnings").catch_warnings():
