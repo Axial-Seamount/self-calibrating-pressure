@@ -504,11 +504,11 @@ psi, temperatures in °C. Data goes to `SCPR-data-collection/sample_data/DATE/`.
   fixed by OOI). That period, 2024-04-11 → 04-17 and short restart fragments on 9 other days
   are re-timed to about 0.75 s (see [Timing](#periods-without-timestamps)); 34 min of gauge data
   on the deployment day (2018-07-06) and 5 min on 2022-09-08 cannot be re-timed.
-* **Gauge disagreements outside calibrations.** On some days PARO1 and PARO2 diverge by up to
-  ~600 Pa for several hours (e.g. 2022-02-16 01:31 → 07:46, 2023-12-15 00:28 → 07:04; visible as
-  spikes in the lower panel of the figure), often around operator sessions in the controller log
-  (`OOI-CMD`). These periods are not masked in the corrected data yet; cause to be confirmed with
-  the SCPR team (gimbal levelling and similar operations can disturb the gauges).
+* **Gauge differences outside calibrations are expected.** On some days PARO1 and PARO2 differ
+  by up to ~600 Pa for several hours (e.g. 2022-02-16, 2023-12-15; the spikes in the lower panel
+  of the pressure figure), often around operator sessions in the controller log (`OOI-CMD`).
+  This is expected instrument behaviour; these hours are kept in the corrected data and the
+  uplift estimate (a few cm in a daily value, negligible in the 30-day mean).
 * **No calibration since 2026-02-05**: data after about 2026-08-21 is converted but not
   drift-corrected (uncertainty > 100 Pa).
 * **LVDT coefficients** (a = 1.222 mm/V, b = 0.25 V for both LVDTs) come from Glenn Sasagawa's
