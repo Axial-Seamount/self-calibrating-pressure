@@ -60,8 +60,13 @@ SCPR_RECORD = re.compile(r"^1 \d{9,} ")
 FILE_TIME = re.compile(r"_\d{8}T(\d{4})_UTC\.dat$")
 
 
-def offset_history(manifest_dir: Path) -> list[tuple[int, float]]:
-    """(date ordinal, daily median clock offset) from manifests of days with real timestamps."""
+def offset_history(manifest_dir: Path) -> list[tuple[float, float]]:
+    """(day, median clock offset) from every manifest whose offset was measured from real stamps.
+
+    day = date ordinal + (mean time of the stamped samples as a day fraction) - 0.5, so a day
+    stamped only in part (e.g. 2026-11-13, stamped from 20:15) counts at the right moment; the
+    clock drifts ~0.55 s/day. Older manifests without that time count only if fully stamped.
+    """
     out = []
     for path in sorted(manifest_dir.glob("scpr_mseed_*.json")):
         try:
@@ -69,8 +74,15 @@ def offset_history(manifest_dir: Path) -> list[tuple[int, float]]:
         except (OSError, ValueError):
             continue
         scpr = m.get("streams", {}).get("SCPR", {})
-        if scpr.get("clock_offset_s") and not scpr.get("reconstructed_records"):
-            out.append((date.fromisoformat(m["date_utc"]).toordinal(), float(scpr["clock_offset_s"]["median"])))
+        co = scpr.get("clock_offset_s")
+        if not co:
+            continue
+        frac = co.get("t_mean_day_fraction")
+        if frac is None:
+            if scpr.get("reconstructed_records"):
+                continue
+            frac = 0.5
+        out.append((date.fromisoformat(m["date_utc"]).toordinal() + float(frac) - 0.5, float(co["median"])))
     return out
 
 
@@ -91,13 +103,24 @@ def predict_offset(history: list[tuple[int, float]], day: date, n_days: int = 30
     d = np.array([h[0] for h in history], float)
     v = np.array([h[1] for h in history])
     o = day.toordinal()
-    preds = []
+    preds, sides = [], {}
     for before in (True, False):
         idx = np.flatnonzero(d < o)[-n_days:] if before else np.flatnonzero(d > o)[:n_days]
         dd, vv = _side_fit(d[idx], v[idx], before)
+        sides[before] = (dd, vv)
         if len(dd) >= 3:
             b, a = np.polyfit(dd - o, vv, 1)
+            sides[before] = (dd, vv, float(b))
             preds.append((float(a), float(np.min(np.abs(dd - o))), "before" if before else "after"))
+    # A side with only 1-2 measured days (e.g. the day the stamps came back) still anchors the
+    # interpolation, using the slope fitted on the other side.
+    for before in (True, False):
+        other = sides.get(not before)
+        dd, vv = sides[before][:2]
+        if 0 < len(dd) < 3 and other is not None and len(other) == 3:
+            a = float(np.mean(vv - other[2] * (dd - o)))
+            preds.append((a, float(np.min(np.abs(dd - o))), "before" if before else "after"))
+    preds.sort(key=lambda x: x[2] != "before")
     if not preds:
         return None, "fewer than 3 timestamped days on the same clock"
     if len(preds) == 2 and abs(preds[0][0] - preds[1][0]) <= 2.0:

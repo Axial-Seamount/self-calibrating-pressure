@@ -13,6 +13,11 @@ own in-situ calibrations against a dead-weight tester.
 * **Calibration record** (`SCPR-data-collection/calibration/`): every calibration since
   deployment (2018-07-06), the drift model and its plot. It ships with the code, so correcting
   any single day needs no archive.
+* **Pressure time series** (`SCPR-data-collection/timeseries/`): one CSV of hourly raw and
+  drift-corrected pressure for both gauges since 2018, and the figure below — both rebuilt and
+  pushed every day by the processing VM.
+
+![SCPR drift-corrected seafloor pressure since 2018](SCPR-data-collection/timeseries/scpr_pressure.png)
 
 All times are UTC.
 
@@ -23,16 +28,17 @@ All times are UTC.
 1. [Repository layout](#repository-layout)
 2. [Installation](#installation)
 3. [Quick start](#quick-start)
-4. [Data source](#data-source)
-5. [Output channels](#output-channels)
-6. [Timing](#timing)
-7. [Calibration and drift correction](#calibration-and-drift-correction)
-8. [Daily operation (maintainers / processing VM)](#daily-operation-maintainers--processing-vm)
-9. [Station metadata (StationXML)](#station-metadata-stationxml)
-10. [Script reference](#script-reference)
-11. [Stand-alone calibration check (steps 1–2)](#stand-alone-calibration-check-steps-12)
-12. [Known issues and open questions](#known-issues-and-open-questions)
-13. [References](#references)
+4. [Pressure time series](#pressure-time-series)
+5. [Data source](#data-source)
+6. [Output channels](#output-channels)
+7. [Timing](#timing)
+8. [Calibration and drift correction](#calibration-and-drift-correction)
+9. [Daily operation (maintainers / processing VM)](#daily-operation-maintainers--processing-vm)
+10. [Station metadata (StationXML)](#station-metadata-stationxml)
+11. [Script reference](#script-reference)
+12. [Stand-alone calibration check (steps 1–2)](#stand-alone-calibration-check-steps-12)
+13. [Known issues and open questions](#known-issues-and-open-questions)
+14. [References](#references)
 
 ---
 
@@ -49,6 +55,7 @@ SCPR-data-collection/
     scpr_retime.py              re-timing of records piweb logged without timestamps
     scpr_calibrate.py           calibration offsets, drift model, drift correction
     scpr_events.py              finds calibration days on piweb without downloading everything
+    scpr_export.py              the hourly pressure time series (CSV) and its figure
     scpr_paths.py               where data is read and written (SCPR_OUTPUT)
     gap_algorithms.py           PREST gap / segment algorithms (vendored, unchanged)
     check_metadata.py           independent check of the StationXML
@@ -60,6 +67,9 @@ SCPR-data-collection/
     calibration_days.csv        calibration days found on piweb
     drift_model.json            fitted drift model, hindcast, uncertainty model
     drift.png                   drift curves and PARO1 - PARO2 difference
+  timeseries/                   committed, rebuilt daily: the pressure record in one file
+    scpr_pressure_hourly.csv    hourly means since 2018, both gauges, raw and drift-corrected
+    scpr_pressure.png           the figure at the top of this README
   output/
     xml/                        committed: OO_AXCC1_40.xml, OO_AXCC1_41.xml
     raw/ mseed/ mseed_corrected/ manifest/ cache/ logs/   generated, not committed
@@ -117,6 +127,38 @@ record. Output (SDS layout, one file per channel-day):
 * `--offsets masked` uses the second calibration averaging (see
   [Calibration offset](#calibration-offset-per-event-per-gauge)) and writes to
   `output/mseed_corrected_masked/`.
+
+## Pressure time series
+
+`SCPR-data-collection/timeseries/scpr_pressure_hourly.csv` is the whole record in one file: one
+row per hour since 2018-07-06, built by `scpr_export.py` from the raw MiniSEED and the
+committed calibration record. For each gauge (`paro1_…` = loc 40, `paro2_…` = loc 41):
+
+| Column | Meaning |
+|---|---|
+| `time_utc` | start of the hour |
+| `*_raw_pa` | mean gauge pressure as recorded (Pa, absolute) |
+| `*_corr_pa` | mean drift-corrected pressure, default calibration averaging (glenn) |
+| `*_corr_masked_pa` | the same with the masked averaging |
+| `*_drift_sigma_pa` | 1σ uncertainty of the drift removed |
+| `*_n` | number of 1-Hz samples in the mean |
+
+Calibrations are left out as in the corrected MiniSEED (60 s before to 30 min after); the hourly
+means agree with the corrected MiniSEED to 0.05 Pa. Corrected columns are empty where the drift
+uncertainty exceeds 100 Pa (currently after 2026-08-21). Both corrected series are relative to
+each gauge's first calibration (2018-07-09). The file header records the calibration table
+version and when it was generated.
+
+The figure (`scpr_pressure.png`, shown at the top) is drawn from this file: daily means of the
+corrected pressure change for both gauges with the calibration dates, and the PARO1 − PARO2
+difference before and after correction. The processing VM rebuilds both every day and pushes
+them with the calibration record, so a new calibration updates the whole series.
+
+```bash
+python scpr_export.py                        # rebuild CSV + figure (needs the MiniSEED archive)
+python scpr_export.py --plot-only            # redraw the figure from the CSV
+python scpr_export.py --interval 86400 --out ../output/scpr_pressure_daily.csv   # daily means
+```
 
 ## Data source
 
@@ -356,7 +398,7 @@ python scpr.py build     # first time: find calibration days, convert only those
                          #   calibration, fit the drift model -> calibration/
 python scpr.py update    # daily: new calibrations, refitted model, re-correction of every local
                          #   day made with an older table/model, yesterday converted + corrected
-python scpr.py update --git-push   # ... and commit + push calibration/ when it changed
+python scpr.py update --git-push   # ... and commit + push calibration/ and timeseries/
 ```
 
 On the processing VM, cron runs `SCPR-data-collection/run/run_daily_update.sh` (settings:
@@ -369,6 +411,9 @@ On the processing VM, cron runs `SCPR-data-collection/run/run_daily_update.sh` (
 * `update` exits non-zero when a day could not be processed and says which, so cron mail or
   monitoring notices; all other days are still processed.
 * Pushing needs the VM's own git credentials (e.g. a deploy key).
+* After the day's correction, `update` rebuilds `timeseries/` from scratch (~1.5 min with 4
+  processes; `--no-export` skips it). It reads every day's raw MiniSEED, so the VM needs the
+  full archive (the backfill below); days not on disk are simply missing from the file.
 * A new calibration changes the whole drift curve, so every corrected day is redone; days after
   the previous last calibration become final.
 * Processing versions are recorded per day (`converter_version`, `drift_model_version`); after a
@@ -405,7 +450,8 @@ All scripts are in `SCPR-data-collection/bin/`; `--help` lists every option.
 |---|---|
 | `scpr.py day DATE [--end DATE] [--workers N] [--method fit\|linear] [--offsets glenn\|masked] [--reconvert]` | download, convert, drift-correct |
 | `scpr.py build [--start] [--end]` | build the calibration record from piweb |
-| `scpr.py update [--no-yesterday] [--git-push]` | daily incremental update |
+| `scpr.py update [--no-yesterday] [--no-export] [--git-push]` | daily incremental update (incl. the time series) |
+| `scpr_export.py [--start] [--end] [--interval S] [--out] [--plot-only]` | the time series CSV and figure |
 | `scpr_mseed.py --date DATE [--download] [--raw-dir DIR]` | convert one day only |
 | `scpr_calibrate.py extract --start --end` | calibration offsets from MiniSEED into the table |
 | `scpr_calibrate.py apply --start --end` | drift-correct a date range |
@@ -444,6 +490,11 @@ psi, temperatures in °C. Data goes to `SCPR-data-collection/sample_data/DATE/`.
   fixed by OOI). That period, 2024-04-11 → 04-17 and short restart fragments on 9 other days
   are re-timed to about 0.75 s (see [Timing](#periods-without-timestamps)); 34 min of gauge data
   on the deployment day (2018-07-06) and 5 min on 2022-09-08 cannot be re-timed.
+* **Gauge disagreements outside calibrations.** On some days PARO1 and PARO2 diverge by up to
+  ~600 Pa for several hours (e.g. 2022-02-16 01:31 → 07:46, 2023-12-15 00:28 → 07:04; visible as
+  spikes in the lower panel of the figure), often around operator sessions in the controller log
+  (`OOI-CMD`). These periods are not masked in the corrected data yet; cause to be confirmed with
+  the SCPR team (gimbal levelling and similar operations can disturb the gauges).
 * **No calibration since 2026-02-05**: data after about 2026-08-21 is converted but not
   drift-corrected (uncertainty > 100 Pa).
 * **LVDT coefficients** (a = 1.222 mm/V, b = 0.25 V for both LVDTs) come from Glenn Sasagawa's

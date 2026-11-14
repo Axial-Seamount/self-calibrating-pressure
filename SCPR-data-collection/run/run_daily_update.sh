@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Daily SCPR update for the processing VM (cron). Scans piweb for new days, adds any new
 # calibration to calibration/calibrations.csv, refits the drift model, re-corrects every
-# local day built with an older table/model, converts + corrects yesterday, and pushes
-# calibration/ when it changed.
+# local day built with an older table/model, converts + corrects yesterday, rebuilds the
+# hourly pressure time series and its figure (timeseries/), and pushes calibration/ and
+# timeseries/ when they changed.
 #
 # Crontab (06:00 UTC):
 #   0 6 * * * /path/to/self-calibrating-pressure/SCPR-data-collection/run/run_daily_update.sh
@@ -10,7 +11,7 @@
 # Settings (environment, with defaults):
 #   SCPR_OUTPUT   where raw/, mseed/, mseed_corrected/, manifest/, cache/ live
 #   SCPR_PYTHON   python of the conda env from environment.yml
-#   SCPR_PUSH     1 = commit and push calibration/ when it changed (needs git credentials)
+#   SCPR_PUSH     1 = commit and push calibration/ and timeseries/ when changed (needs git credentials)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"          # SCPR-data-collection

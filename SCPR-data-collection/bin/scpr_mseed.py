@@ -577,7 +577,10 @@ def convert_day(day: date, raw_dir: Path, out: Path = DEFAULT_MSEED, manifest_di
                                        "log_files": rec["log_files"], "reconstructed_records": added,
                                        "bursts_repaired": bursts, "calibration_flag_intervals": intervals,
                                        "clock_offset_s": ({"min": float(lce.min()), "median": float(np.median(lce)),
-                                                           "max": float(lce.max())} if len(lce) else None)}
+                                                           "max": float(lce.max()),
+                                                           # when the offset was measured (stamped part of the day)
+                                                           "t_mean_day_fraction": float((np.mean(lce_t) - day0) / 86400)}
+                                                          if len(lce) else None)}
     else:
         manifest["skipped"].append("SCPR: no raw file (auxiliary channels, LCE and LEF)")
 

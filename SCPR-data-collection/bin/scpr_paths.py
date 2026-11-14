@@ -1,7 +1,7 @@
 """Where the SCPR pipeline reads and writes.
 
-Layout: <repo>/SCPR-data-collection/{bin, calibration, output, run}; this file is in bin/.
-CALIBRATION is part of the git checkout (the table and drift model shared with users).
+Layout: <repo>/SCPR-data-collection/{bin, calibration, timeseries, output, run}; this file is in bin/.
+CALIBRATION and TIMESERIES are part of the git checkout (shared with users).
 OUTPUT holds everything generated and large (raw downloads, MiniSEED, manifests, cache);
 it defaults to SCPR-data-collection/output and can be moved with the SCPR_OUTPUT environment variable,
 e.g. on the processing VM:  export SCPR_OUTPUT=/data/scpr
@@ -13,6 +13,7 @@ from pathlib import Path
 BIN = Path(__file__).resolve().parent
 ROOT = BIN.parent                         # SCPR-data-collection
 CALIBRATION = ROOT / "calibration"
+TIMESERIES = ROOT / "timeseries"          # hourly pressure CSV + figure, rebuilt daily and committed
 OUTPUT = Path(os.environ.get("SCPR_OUTPUT") or ROOT / "output").expanduser().resolve()
 
 RAW = OUTPUT / "raw"                      # piweb .dat files, one folder per day

@@ -40,6 +40,7 @@ from obspy.clients.filesystem.sds import Client
 
 import scpr_calibrate as sc
 import scpr_events as ev
+import scpr_paths as paths
 from scpr_mseed import CONVERTER_VERSION, DEFAULT_MANIFEST, DEFAULT_MSEED, convert_day, sds_path
 
 ROOT = Path(__file__).resolve().parent
@@ -229,17 +230,18 @@ def cmd_build(args: argparse.Namespace) -> None:
 
 
 def publish_calibration(message: str) -> bool:
-    """Commit and push calibration/ if it changed. Uses the machine's own git identity."""
+    """Commit and push calibration/ and timeseries/ if they changed (machine's own git identity)."""
     import subprocess
     run = lambda *cmd: subprocess.run(["git", "-C", str(ROOT), *cmd], check=True, capture_output=True, text=True)
-    target = str(sc.MODEL_DIR)
-    if not run("status", "--porcelain", "--", target).stdout.strip():
-        print("calibration/ unchanged; nothing to push")
+    targets = [str(sc.MODEL_DIR), str(paths.TIMESERIES)]
+    changed = run("status", "--porcelain", "--", *targets).stdout.strip()
+    if not changed:
+        print("calibration/ and timeseries/ unchanged; nothing to push")
         return False
-    run("add", "--", target)
-    run("commit", "-m", message, "--", target)
+    run("add", "--", *targets)
+    run("commit", "-m", message, "--", *targets)
     run("push")
-    print(f"Pushed calibration/: {message}")
+    print(f"Pushed: {message}")
     return True
 
 
@@ -261,14 +263,22 @@ def cmd_update(args: argparse.Namespace) -> None:
             except (OSError, ValueError) as exc:     # e.g. yesterday not timestamped; keep going
                 print(f"{day}: {exc}")
                 failed.append(day)
+    if not args.no_export:
+        try:
+            import scpr_export
+            scpr_export.export(workers=args.export_workers)
+        except Exception as exc:                      # report, keep the rest of the update
+            print(f"time series export failed: {exc}")
+            failed.append("export")
     if args.git_push:
         rows = [r for r in sc.read_table(sc.DEFAULT_TABLE) if r["status"] == "ok"]
         last = max((r["t0_utc"][:10] for r in rows), default="none")
         try:
-            publish_calibration(f"Update SCPR calibration table ({len(rows) // 2} events, last {last})")
+            publish_calibration(f"Daily SCPR update to {yesterday()}: calibration table ({len(rows) // 2} events, "
+                                f"last {last}) and time series")
         except Exception as exc:                      # report, but keep the processing result
             stderr = getattr(exc, "stderr", "") or ""
-            raise ValueError(f"git push of calibration/ failed: {exc} {stderr.strip()}") from exc
+            raise ValueError(f"git push of calibration/ and timeseries/ failed: {exc} {stderr.strip()}") from exc
     elif before != version:
         print("calibration/ changed: commit and push it (or run update --git-push) so users get it")
     if failed:
@@ -299,6 +309,9 @@ def main() -> None:
     p.set_defaults(func=cmd_build)
     p = sub.add_parser("update", help="Maintainers: incremental build + re-correct stale days (cron)")
     p.add_argument("--no-yesterday", action="store_true", help="Do not convert and correct yesterday")
+    p.add_argument("--no-export", action="store_true",
+                   help="Do not rebuild the time series file output/scpr_pressure_hourly.csv")
+    p.add_argument("--export-workers", type=int, default=4, help="Processes for the time series export")
     p.add_argument("--git-push", action="store_true",
                    help="Commit and push calibration/ when it changed (machine's git identity)")
     p.set_defaults(func=cmd_update)
