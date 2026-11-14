@@ -9,7 +9,8 @@ Calibrations are left out exactly as in the corrected MiniSEED (60 s before LEF 
 pressure < 15 400 kPa, to 30 min after). Corrected values are empty where the drift
 uncertainty exceeds the limit (no correction), i.e. after about 2026-08-21.
 
-    python scpr_export.py          # 2018-07-06 .. yesterday -> timeseries/scpr_pressure_hourly.csv + scpr_pressure.png
+    python scpr_export.py          # 2018-07-06 .. yesterday -> timeseries/scpr_pressure_hourly.csv,
+                                   #   scpr_pressure.png and scpr_uplift.png
     (scpr.py update rebuilds both every day, after the day's correction, and --git-push commits them)
     python scpr_export.py --interval 86400 --out ../output/scpr_pressure_daily.csv
 """
@@ -89,6 +90,10 @@ def day_rows(job: tuple[date, int]) -> list[tuple]:
 
 DEFAULT_OUT = paths.TIMESERIES / "scpr_pressure_hourly.csv"
 DEFAULT_PNG = paths.TIMESERIES / "scpr_pressure.png"
+UPLIFT_PNG = paths.TIMESERIES / "scpr_uplift.png"
+# Seafloor pressure change -> vertical displacement: dP = -rho * g * dz, with the in-situ
+# seawater density at the SCPR (~1530 m, ~2.3 degC, S ~34.6: ~1035 kg/m3) and g at 46 N.
+RHO_SEAFLOOR, G_LOCAL = 1035.0, 9.808
 
 
 def export(start: date = FIRST_DAY, end: date | None = None, interval: int = 3600,
@@ -139,6 +144,7 @@ def export(start: date = FIRST_DAY, end: date | None = None, interval: int = 360
     print(f"Time series: {written} rows -> {args.out}")
     if args.out == DEFAULT_OUT:
         plot(args.out, DEFAULT_PNG)
+        plot_uplift(args.out, UPLIFT_PNG)
     return args.out
 
 
@@ -224,6 +230,76 @@ def plot(csv: Path, png: Path) -> Path:
     return png
 
 
+def running_mean(y: np.ndarray, width: int) -> np.ndarray:
+    ok = np.isfinite(y)
+    k = np.ones(width)
+    n = np.convolve(ok.astype(float), k, "same")
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(n >= width * 0.6, np.convolve(np.where(ok, y, 0.0), k, "same") / n, np.nan)
+
+
+def plot_uplift(csv: Path, png: Path) -> Path:
+    """Estimated seafloor uplift since the first calibration, and its rate."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    t, c, _ = read_csv(csv)
+    models = _models()["glenn"]
+    last_cal = np.datetime64(sc.iso_s(models["PARO1"].t[-1])[:19])
+    rho_g = RHO_SEAFLOOR * G_LOCAL
+    plt.rcParams.update({"font.size": 9, "axes.edgecolor": INK2, "axes.labelcolor": INK, "xtick.color": INK2,
+                         "ytick.color": INK2, "axes.spines.top": False, "axes.spines.right": False})
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(10, 6.2), sharex=True, height_ratios=(2.2, 1),
+                                 facecolor=SURFACE, constrained_layout=True)
+    ups = []
+    for g in GAUGES:
+        x, p = daily(t, c[f"{g.lower()}_corr_pa"])
+        first = np.flatnonzero(np.isfinite(p))[:30]
+        up = -(p - np.nanmean(p[first])) / rho_g                 # m, relative to the first month
+        ups.append(up)
+        a1.plot(x, up, color=COLORS[g], lw=0.7, alpha=0.55, label=f"{g} (daily mean)")
+    with np.errstate(invalid="ignore"), __import__("warnings").catch_warnings():
+        __import__("warnings").simplefilter("ignore", RuntimeWarning)       # days with no gauge
+        mean_up = np.nanmean(np.vstack(ups), axis=0)
+    smooth = running_mean(mean_up, 30)
+    a1.plot(x, smooth, color=INK, lw=1.6, label="both gauges, 30-day mean")
+    fin = np.flatnonzero(np.isfinite(smooth))
+    a1.annotate(f"{smooth[fin[-1]] * 100:+.0f} cm", (x[fin[-1]], smooth[fin[-1]]), xytext=(5, 0),
+                textcoords="offset points", va="center", color=INK, fontsize=8.5)
+    a1.set_ylabel("Uplift since July 2018 (m)")
+    a1.set_title("Estimated seafloor uplift at the central caldera, from drift-corrected SCPR pressure",
+                 loc="left", color=INK, fontsize=10)
+    a1.legend(loc="upper left", frameon=False, fontsize=8)
+    # rate: slope of the 30-day mean over a centred 180-day window, cm/yr
+    rate = np.full(len(smooth), np.nan)
+    half, days = 90, (x - x[0]).astype("timedelta64[h]").astype(float) / 24.0
+    for i in range(half, len(smooth) - half):
+        w = slice(i - half, i + half + 1)
+        ok = np.isfinite(smooth[w])
+        if ok.sum() > 0.8 * (2 * half + 1):
+            rate[i] = np.polyfit(days[w][ok], smooth[w][ok], 1)[0] * 365.25 * 100
+    a2.plot(x, rate, color=INK, lw=1.3)
+    a2.axhline(0, color=INK2, lw=0.6)
+    a2.set_ylabel("Uplift rate (cm/yr)")
+    a2.set_title("Uplift rate (180-day window)", loc="left", color=INK, fontsize=10)
+    for ax in (a1, a2):
+        ax.set_facecolor(SURFACE)
+        ax.grid(True, color=GRID, lw=0.6)
+        ax.axvspan(last_cal, t[-1], color=GRID, alpha=0.45, lw=0)
+    a2.xaxis.set_major_locator(mdates.YearLocator())
+    a2.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+    a2.set_xlabel(f"Uplift = -\u0394P / (\u03c1g), \u03c1 = {RHO_SEAFLOOR:.0f} kg/m\u00b3, g = {G_LOCAL} m/s\u00b2 "
+                  f"(1 kPa \u2248 {1000 / rho_g * 100:.1f} cm). No reference station: ocean pressure changes "
+                  f"(~cm) remain. Shaded: after the last calibration. Updated {str(t[-1])[:10]}.",
+                  fontsize=7, color=INK2, loc="right")
+    png.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(png, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+    print(f"Figure -> {png}")
+    return png
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--start", type=date.fromisoformat, default=FIRST_DAY)
@@ -235,6 +311,7 @@ def main() -> None:
     a = ap.parse_args()
     if a.plot_only:
         plot(a.out, DEFAULT_PNG)
+        plot_uplift(a.out, UPLIFT_PNG)
         return
     export(a.start, a.end, a.interval, a.out, a.workers)
 

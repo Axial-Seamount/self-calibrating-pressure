@@ -14,8 +14,10 @@ own in-situ calibrations against a dead-weight tester.
   deployment (2018-07-06), the drift model and its plot. It ships with the code, so correcting
   any single day needs no archive.
 * **Pressure time series** (`SCPR-data-collection/timeseries/`): one CSV of hourly raw and
-  drift-corrected pressure for both gauges since 2018, and the figure below — both rebuilt and
-  pushed every day by the processing VM.
+  drift-corrected pressure for both gauges since 2018, and the figures below (estimated uplift,
+  corrected pressure) — all rebuilt and pushed every day by the processing VM.
+
+![Estimated seafloor uplift at Axial central caldera since 2018](SCPR-data-collection/timeseries/scpr_uplift.png)
 
 ![SCPR drift-corrected seafloor pressure since 2018](SCPR-data-collection/timeseries/scpr_pressure.png)
 
@@ -69,7 +71,8 @@ SCPR-data-collection/
     drift.png                   drift curves and PARO1 - PARO2 difference
   timeseries/                   committed, rebuilt daily: the pressure record in one file
     scpr_pressure_hourly.csv    hourly means since 2018, both gauges, raw and drift-corrected
-    scpr_pressure.png           the figure at the top of this README
+    scpr_pressure.png           drift-corrected pressure and PARO1 - PARO2 (top of this README)
+    scpr_uplift.png             estimated uplift and uplift rate (top of this README)
   output/
     xml/                        committed: OO_AXCC1_40.xml, OO_AXCC1_41.xml
     raw/ mseed/ mseed_corrected/ manifest/ cache/ logs/   generated, not committed
@@ -149,14 +152,24 @@ uncertainty exceeds 100 Pa (currently after 2026-08-21). Both corrected series a
 each gauge's first calibration (2018-07-09). The file header records the calibration table
 version and when it was generated.
 
-The figure (`scpr_pressure.png`, shown at the top) is drawn from this file: daily means of the
-corrected pressure change for both gauges with the calibration dates, and the PARO1 − PARO2
-difference before and after correction. The processing VM rebuilds both every day and pushes
-them with the calibration record, so a new calibration updates the whole series.
+Two figures are drawn from this file (both shown at the top):
+
+* `scpr_pressure.png` — daily means of the corrected pressure change for both gauges with the
+  calibration dates, and the PARO1 − PARO2 difference before and after correction.
+* `scpr_uplift.png` — **estimated seafloor uplift** since July 2018: uplift = −ΔP / (ρg) with the
+  in-situ seawater density at the SCPR (ρ ≈ 1035 kg/m³ at ~1530 m) and g = 9.808 m/s², so
+  1 kPa ≈ 9.9 cm; daily means of each gauge, the 30-day mean of both, and the uplift rate
+  (slope over a centred 180-day window, cm/yr). Caveats: there is no reference pressure station
+  off the volcano here, so oceanographic pressure changes (seasonal, a few cm) remain in the
+  estimate and in the rate; and after the last calibration (shaded) the gauge drift is
+  extrapolated, so the most recent months can change when the next calibration arrives.
+
+The processing VM rebuilds the file and both figures every day and pushes them with the
+calibration record, so a new calibration updates the whole series.
 
 ```bash
 python scpr_export.py                        # rebuild CSV + figure (needs the MiniSEED archive)
-python scpr_export.py --plot-only            # redraw the figure from the CSV
+python scpr_export.py --plot-only            # redraw both figures from the CSV
 python scpr_export.py --interval 86400 --out ../output/scpr_pressure_daily.csv   # daily means
 ```
 
