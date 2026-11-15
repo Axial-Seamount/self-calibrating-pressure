@@ -655,6 +655,13 @@ def model(args: argparse.Namespace) -> None:
     path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     plot_drift(models, args.model_dir / "drift.png")
     print(f"Model: {path}; plot: {args.model_dir / 'drift.png'}")
+    if getattr(args, "offsets", "glenn") == "glenn":
+        # The second averaging as well, so stand-alone users (scpr-correct --offsets masked) can use it.
+        masked = argparse.Namespace(**{**vars(args), "offsets": "masked"})
+        _, report_m = build_models(masked, verbose=False)
+        path_m = args.model_dir / "drift_model_masked.json"
+        path_m.write_text(json.dumps(report_m, indent=2) + "\n", encoding="utf-8")
+        print(f"Model (masked averaging): {path_m}")
 
 
 def paro_difference(models: dict[str, DriftModel]) -> list[dict]:

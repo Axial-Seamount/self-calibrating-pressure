@@ -13,6 +13,11 @@ own in-situ calibrations against a dead-weight tester.
 * **Calibration record** (`SCPR-data-collection/calibration/`): every calibration since
   deployment (2018-07-06), the drift model and its plot. It ships with the code, so correcting
   any single day needs no archive.
+* **Stand-alone calibration package**: [coszo-hub/SCPR-calibration](https://github.com/coszo-hub/SCPR-calibration)
+  (`pip install git+https://github.com/coszo-hub/SCPR-calibration`, command `scpr-correct`)
+  turns raw SCPR MiniSEED into drift-corrected MiniSEED using the drift model published here
+  (`calibration/drift_model.json`, `drift_model_masked.json`); its output is identical to this
+  pipeline's.
 * **Pressure time series** (`SCPR-data-collection/timeseries/`): one CSV of hourly raw and
   drift-corrected pressure for both gauges since 2018, and the figures below (estimated uplift,
   corrected pressure) — all rebuilt and pushed every day by the processing VM.
@@ -67,7 +72,8 @@ SCPR-data-collection/
   calibration/                  committed: the calibration record used by every correction
     calibrations.csv            one row per gauge and calibration event
     calibration_days.csv        calibration days found on piweb
-    drift_model.json            fitted drift model, hindcast, uncertainty model
+    drift_model.json            fitted drift model, hindcast, uncertainty model (read by scpr-correct)
+    drift_model_masked.json     the same for the masked calibration averaging
     drift.png                   drift curves and PARO1 - PARO2 difference
   timeseries/                   committed, rebuilt daily: the pressure record in one file
     scpr_pressure_hourly.csv    hourly means since 2018, both gauges, raw and drift-corrected
