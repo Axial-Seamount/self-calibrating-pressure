@@ -90,10 +90,14 @@ EVENT_SCATTER_PA = 30.0
 TAIL_EVENTS = 4
 # Drift uncertainty: DRIFT_SIGMA0_PA inside the record (event scatter about a smooth
 # curve), growing as sqrt(s0^2 + (rate * days since last event)^2) afterwards (rate
-# fitted to the hindcast errors). Correction stops when it exceeds MAX_DRIFT_SIGMA_PA
-# (~1 cm of water; ~200 days) or at --max-extrapolation-days, whichever comes first.
-DRIFT_SIGMA0_PA, DRIFT_SIGMA_RATE_PA_PER_YR, MAX_DRIFT_SIGMA_PA = 40.0, 170.0, 100.0
-DRIFT_MODEL_VERSION = 3          # bump when the drift logic changes: local corrections get redone
+# fitted to the hindcast errors). After the last calibration the extrapolated correction
+# (provisional) is still far closer than no correction (raw data carry the full drift, ~2.4 kPa
+# for AXCC1 PARO1 by 2026), so correction continues, with this uncertainty, until
+# --max-extrapolation-days (365: the hindcast has no lead beyond ~11 months). An optional
+# --max-drift-sigma (Pa) stops it earlier; default none.
+DRIFT_SIGMA0_PA, DRIFT_SIGMA_RATE_PA_PER_YR, MAX_DRIFT_SIGMA_PA = 40.0, 170.0, None
+DRIFT_MODEL_VERSION = 4          # bump when the drift logic changes: local corrections get redone
+                                 # 4: no 100 Pa cut-off; provisional correction up to 365 days
 TAU_GRID_DAYS = np.geomspace(2.0, 3000.0, 240)
 MASK_BEFORE_S = 60.0
 PA_PER_PSI = cal.KPA_PER_PSI * 1000.0
@@ -333,7 +337,7 @@ class DriftModel:
 
     def __init__(self, gauge: str, rows: list[dict], method: str, max_extrapolation_days: float,
                  thermal: bool, offsets: str = "glenn", event_scatter: float = EVENT_SCATTER_PA,
-                 tail_events: int = TAIL_EVENTS, max_sigma: float = MAX_DRIFT_SIGMA_PA) -> None:
+                 tail_events: int = TAIL_EVENTS, max_sigma: float | None = MAX_DRIFT_SIGMA_PA) -> None:
         self.gauge = gauge
         self.t = np.array([UTCDateTime(r["t0_utc"]).timestamp for r in rows])
         d = np.array([float(r[OFFSET_COLUMNS[offsets][0]]) for r in rows])
@@ -376,7 +380,8 @@ class DriftModel:
             self.ref = float(self.y[0])
         self.residual = self.y - self._interior(self.t)
         self.rms = float(np.sqrt(np.mean(self.residual**2)))
-        dt_sigma = (math.sqrt(max_sigma**2 - DRIFT_SIGMA0_PA**2) / DRIFT_SIGMA_RATE_PA_PER_YR * 365.25
+        dt_sigma = (math.inf if max_sigma is None else
+                    math.sqrt(max_sigma**2 - DRIFT_SIGMA0_PA**2) / DRIFT_SIGMA_RATE_PA_PER_YR * 365.25
                     if max_sigma > DRIFT_SIGMA0_PA else 0.0)
         self.t_last_valid = self.t[-1] + min(max_extrapolation_days, dt_sigma) * 86400.0
 
@@ -704,9 +709,9 @@ def add_model_options(p: argparse.ArgumentParser) -> None:
     p.add_argument("--table", type=Path, default=DEFAULT_TABLE)
     p.add_argument("--method", choices=("fit", "linear"), default="fit")
     p.add_argument("--max-extrapolation-days", type=float, default=365.0,
-                   help="Hard limit after the last calibration (default 365; the sigma limit usually stops first)")
+                   help="Correct (provisionally) at most this long after the last calibration (default 365)")
     p.add_argument("--max-drift-sigma", type=float, default=MAX_DRIFT_SIGMA_PA,
-                   help="Stop correcting when the drift uncertainty exceeds this (Pa, default 100)")
+                   help="Optionally stop correcting earlier, when the drift uncertainty exceeds this (Pa; default: no limit)")
     p.add_argument("--tail-events", type=int, default=TAIL_EVENTS,
                    help="Calibrations in the line extrapolated after the last one (default 4)")
     p.add_argument("--settle-seconds", type=float, default=1800.0,

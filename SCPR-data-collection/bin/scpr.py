@@ -92,8 +92,8 @@ def describe(entry: dict) -> str:
         if s is None:
             parts.append(f"{gauge} no data")
         elif not s["written"]:
-            parts.append(f"{gauge} NOT corrected (after {s['valid_until_utc'][:10]}: drift uncertainty "
-                         f"> {sc.MAX_DRIFT_SIGMA_PA:.0f} Pa since the last calibration {s['last_calibration_utc'][:10]})")
+            parts.append(f"{gauge} NOT corrected (after {s['valid_until_utc'][:10]}: too long since the last "
+                         f"calibration {s['last_calibration_utc'][:10]})")
         else:
             note = " PROVISIONAL" if s["provisional"] else ""
             sigma = max(s["drift_sigma_pa_at_day_start_end"])

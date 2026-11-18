@@ -128,6 +128,13 @@ def export(start: date = FIRST_DAY, end: date | None = None, interval: int = 360
     days = [args.start + timedelta(days=i) for i in range((args.end - args.start).days + 1)]
     with ProcessPoolExecutor(args.workers) as ex:
         rows = [r for chunk in ex.map(day_rows, [(d, args.interval) for d in days], chunksize=8) for r in chunk]
+    return write_rows(rows, args.start, args.end, args.interval, args.out)
+
+
+def write_rows(rows: list[tuple], start: date, end: date, interval: int, out: Path) -> Path:
+    """Write the time series file from evenly spaced rows [(bin start, {gauge: [raw, corr,
+    corr_masked, drift_sigma, n]})] (empty dict = no data), then redraw the figures."""
+    args = argparse.Namespace(start=start, end=end, interval=interval, out=out)
     models = _models()
     version = sc.table_version(sc.DEFAULT_TABLE)
     last = {g: sc.iso_s(models["glenn"][g].t[-1]) for g in GAUGES}
@@ -164,8 +171,9 @@ def export(start: date = FIRST_DAY, end: date | None = None, interval: int = 360
                  f"{FIRST_DAY + timedelta(days=REF_DAYS - 1)}\n"
                  f"#   (PARO1 {ref['PARO1']:.1f} Pa, PARO2 {ref['PARO2']:.1f} Pa). No reference station: ocean pressure changes remain.\n"
                  "# *_drift_sigma: 1-sigma uncertainty of the drift removed. *_n: 1-Hz samples averaged.\n"
-                 f"# Empty corr: drift uncertainty > 100 Pa (corrected until {valid['PARO1'][:10]}); after the last calibration\n"
-                 f"#   ({last['PARO1'][:10]}) the drift is extrapolated (provisional).\n"
+                 f"# After the last calibration ({last['PARO1'][:10]}) the drift is extrapolated (a line through the last\n"
+                 f"#   calibrations): corrected values there are PROVISIONAL, with the growing drift_sigma; empty corr after\n"
+                 f"#   {valid['PARO1'][:10]} (too long since the last calibration). A new calibration updates the whole file.\n"
                  f"# Calibration table {version}; generated {datetime.now(timezone.utc):%Y-%m-%dT%H:%M}Z by scpr_export.py\n")
         unit = {"n": "", "uplift": "_m"}
         fh.write("time_utc," + ",".join(f"{g.lower()}_{n}{unit.get(n, '_pa')}" for g in GAUGES for n in names) + "\n")
@@ -192,18 +200,57 @@ def export(start: date = FIRST_DAY, end: date | None = None, interval: int = 360
     return args.out
 
 
+
+
+def refresh(out: Path = DEFAULT_OUT, end: date | None = None, workers: int = 6) -> Path:
+    """Update the existing file without the MiniSEED archive: recompute the corrected,
+    uplift and drift_sigma columns from its raw columns with the current drift model (the
+    drift changes by ~1 Pa/day, so evaluating it at the hour centre is exact to < 0.01 Pa),
+    and append the days after its last row from the local MiniSEED (up to `end`, default
+    yesterday). For when only part of the archive is on this machine."""
+    from scpr import yesterday
+    end = end or yesterday()
+    t, c, _ = read_csv(out)
+    interval = int(np.median(np.diff(t[:1000]).astype("timedelta64[s]").astype(int)))
+    t0 = t.astype("datetime64[s]").astype(np.int64).astype(float)
+    models = _models()
+    mid = t0 + interval / 2
+    vals: dict[float, dict] = {}
+    cols = {}
+    for g in GAUGES:
+        k = g.lower()
+        raw, n = c[f"{k}_raw_pa"], c[f"{k}_n"]
+        cols[g] = np.column_stack([raw, raw - models["glenn"][g].delta(mid), raw - models["masked"][g].delta(mid),
+                                   models["glenn"][g].sigma_drift(mid), n])
+    for i, tt in enumerate(t0):
+        vals[tt] = {g: cols[g][i] for g in GAUGES if np.isfinite(cols[g][i, 0])}
+    last_day = datetime.fromtimestamp(t0[-1], timezone.utc).date()
+    new_days = [last_day + timedelta(days=i) for i in range(1, (end - last_day).days + 1)]
+    if new_days:
+        with ProcessPoolExecutor(workers) as ex:
+            for chunk in ex.map(day_rows, [(d, interval) for d in new_days]):
+                for tt, v in chunk:
+                    vals[tt] = v
+    grid = np.arange(t0[0], max(vals) + interval, interval)
+    rows = [(tt, vals.get(tt, {})) for tt in grid]
+    print(f"Refreshed {len(t0)} rows from the file's raw columns; appended {len(new_days)} day(s) "
+          f"({new_days[0] if new_days else '-'} .. {new_days[-1] if new_days else '-'}) from {paths.MSEED}")
+    return write_rows(rows, FIRST_DAY, end, interval, out)
+
+
 # Categorical slots 1-2 of the reference palette (validated light-mode pair); text in ink tokens.
 COLORS = {"PARO1": "#2a78d6", "PARO2": "#eb6834"}
 INK, INK2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
 
-def label_extrapolated(ax, last_cal, valid, y_frac: float = 0.03, va: str = "bottom") -> None:
-    """Say what the shaded span after the last calibration is, inside it."""
+def label_extrapolated(ax, last_cal, valid, data_end, y_frac: float = 0.03, va: str = "bottom") -> None:
+    """Say what the grey span after the last calibration is, inside it."""
     import matplotlib.transforms as mtransforms
     tr = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-    ax.text(last_cal, y_frac, f" after the last\n calibration\n ({str(last_cal)[:10]}):\n drift extrapolated;\n"
-                              f" not corrected\n after {str(valid)[:10]}",
-            transform=tr, color=INK2, fontsize=7, va=va, ha="left", linespacing=1.15)
+    text = f" after the last\n calibration\n ({str(last_cal)[:10]}):\n drift extrapolated\n (provisional)"
+    if valid < data_end:
+        text += f";\n not corrected\n after {str(valid)[:10]}"
+    ax.text(last_cal, y_frac, text, transform=tr, color=INK2, fontsize=7, va=va, ha="left", linespacing=1.15)
 
 
 def read_csv(path: Path) -> tuple[np.ndarray, dict, list[str]]:
@@ -260,7 +307,7 @@ def plot(csv: Path, png: Path) -> Path:
     a1.set_ylabel("Pressure change (kPa)")
     a1.set_title("SCPR seafloor pressure, drift-corrected (daily means; shading = drift uncertainty, 1\u03c3)",
                  loc="left", color=INK, fontsize=10)
-    label_extrapolated(a1, last_cal, valid, y_frac=0.97, va="top")
+    label_extrapolated(a1, last_cal, valid, t[-1], y_frac=0.97, va="top")
     a1.legend(loc="upper right", bbox_to_anchor=(0.84, 1.0), frameon=False, fontsize=8, ncol=1)
     for kind, colr, lw, lab in (("raw", INK2, 0.9, "raw"), ("corr", COLORS["PARO1"], 1.2, "drift-corrected")):
         x, d1 = daily(t, c[f"paro1_{kind}_pa"]); _, d2 = daily(t, c[f"paro2_{kind}_pa"])
@@ -313,12 +360,16 @@ def plot_uplift(csv: Path, png: Path) -> Path:
         __import__("warnings").simplefilter("ignore", RuntimeWarning)       # days with no gauge
         mean_up = np.nanmean(np.vstack(ups), axis=0)
     smooth = running_mean(mean_up, 30)
+    _, sig = daily(t, c[f"{GAUGES[0].lower()}_drift_sigma_pa"])
+    band = sig / rho_g                                            # m, 1 sigma of the drift removed
+    a1.fill_between(x, smooth - band, smooth + band, color=INK, alpha=0.3, lw=0,
+                    label="drift uncertainty (1\u03c3)")
     a1.plot(x, smooth, color=INK, lw=1.6, label="both gauges, 30-day mean")
     fin = np.flatnonzero(np.isfinite(smooth))
     a1.annotate(f"{smooth[fin[-1]] * 100:+.0f} cm", (x[fin[-1]], smooth[fin[-1]]), xytext=(5, 0),
                 textcoords="offset points", va="center", color=INK, fontsize=8.5)
     valid = np.datetime64(sc.iso_s(models["PARO1"].t_last_valid)[:19])
-    label_extrapolated(a1, last_cal, valid)
+    label_extrapolated(a1, last_cal, valid, t[-1])
     a1.set_ylabel("Uplift since July 2018 (m)")
     a1.set_title("Estimated seafloor uplift at the central caldera, from drift-corrected SCPR pressure",
                  loc="left", color=INK, fontsize=10)
@@ -343,7 +394,7 @@ def plot_uplift(csv: Path, png: Path) -> Path:
     a2.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     a2.set_xlabel(f"Uplift = -\u0394P / (\u03c1g), \u03c1 = {RHO_SEAFLOOR:.0f} kg/m\u00b3, g = {G_LOCAL} m/s\u00b2 "
                   f"(1 kPa \u2248 {1000 / rho_g * 100:.1f} cm). No reference station: ocean pressure changes "
-                  f"(~cm) remain. Shaded: after the last calibration. Updated {str(t[-1])[:10]}.",
+                  f"(~cm) remain. Grey: after the last calibration (provisional). Updated {str(t[-1])[:10]}.",
                   fontsize=7, color=INK2, loc="right")
     png.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(png, dpi=150, facecolor=SURFACE)
@@ -360,10 +411,16 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--plot-only", action="store_true", help="Redraw the figure from the existing file")
+    ap.add_argument("--refresh", action="store_true",
+                    help="No archive needed: recompute the corrected/uplift columns of the existing file with the "
+                         "current drift model and append newer days from the local MiniSEED")
     a = ap.parse_args()
     if a.plot_only:
         plot(a.out, DEFAULT_PNG)
         plot_uplift(a.out, UPLIFT_PNG)
+        return
+    if a.refresh:
+        refresh(a.out, a.end, a.workers)
         return
     export(a.start, a.end, a.interval, a.out, a.workers)
 

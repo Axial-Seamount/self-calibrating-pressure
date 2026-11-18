@@ -130,8 +130,10 @@ record. Output (SDS layout, one file per channel-day):
 
 * **Provisional:** days after the last calibration use an extrapolated drift. They are marked
   provisional; after `git pull` brings a newer calibration record, run the same command again.
-* **Not corrected:** once the drift uncertainty exceeds 100 Pa (about 200 days after the last
-  calibration) the day is converted but not corrected.
+* **Provisional, then not corrected:** after the last calibration the drift is extrapolated (a line
+  through the last calibrations) and corrected days are provisional, with a drift uncertainty
+  growing from 40 Pa to ~175 Pa at a year; more than 365 days after the last calibration a day is
+  converted but not corrected.
 * `--method linear` interpolates the drift between calibrations instead of using the fitted curve.
 * `--offsets masked` uses the second calibration averaging (see
   [Calibration offset](#calibration-offset-per-event-per-gauge)) and writes to
@@ -154,8 +156,9 @@ committed calibration record. For each gauge (`paro1_…` = loc 40, `paro2_…` 
 | `*_n` | number of 1-Hz samples in the mean |
 
 Calibrations are left out as in the corrected MiniSEED (60 s before to 30 min after); the hourly
-means agree with the corrected MiniSEED to 0.05 Pa. Corrected columns are empty where the drift
-uncertainty exceeds 100 Pa (currently after 2026-08-21). Both corrected series are relative to
+means agree with the corrected MiniSEED to 0.05 Pa. After the last calibration (2026-02-05 for AXCC1)
+the corrected columns are provisional (extrapolated drift, uncertainty in `*_drift_sigma_pa`);
+they are empty more than 365 days after it. Both corrected series are relative to
 each gauge's first calibration (2018-07-09). The file header records the calibration table
 version and when it was generated.
 
@@ -398,8 +401,11 @@ The two differ mostly by a constant (each is relative to its own first calibrati
   hindcast (predict each calibration from the earlier ones): rms error PARO1 / PARO2 72 / 54 Pa,
   versus 112 / 103 Pa holding the last value and 116 / 58 Pa continuing the fitted curve.
 * **Uncertainty** of the drift: 40 Pa inside the record, √(40² + (170 Pa/yr · Δt)²) after the
-  last calibration (57 Pa at 90 days, 93 Pa at 6 months). Correction stops at 100 Pa
-  (`--max-drift-sigma`), about 200 days after the last calibration.
+  last calibration (57 Pa at 90 days, 93 Pa at 6 months, ~175 Pa at a year). Correction continues,
+  provisionally, until 365 days after the last calibration (`--max-extrapolation-days`; the replay
+  test has leads up to ~11 months): an extrapolated drift uncertain by 100–200 Pa is still far closer
+  than no correction (raw AXCC1 PARO1 carries ~2.4 kPa of drift by 2026). `--max-drift-sigma PA`
+  stops it earlier if wanted.
 * Before the first trusted calibration the drift is held at that value.
 * `drift_model.json` holds the coefficients, every event with its residual, the hindcast and the
   uncertainty model; `drift.png` plots it.
@@ -515,8 +521,9 @@ psi, temperatures in °C. Data goes to `SCPR-data-collection/sample_data/DATE/`.
   of the pressure figure), often around operator sessions in the controller log (`OOI-CMD`).
   This is expected instrument behaviour; these hours are kept in the corrected data and the
   uplift estimate (a few cm in a daily value, negligible in the 30-day mean).
-* **No calibration since 2026-02-05**: data after about 2026-08-21 is converted but not
-  drift-corrected (uncertainty > 100 Pa).
+* **No calibration since 2026-02-05**: AXCC1 data since then is corrected provisionally
+  (extrapolated drift, ±138 Pa by mid-November 2026); after 2027-02-05 it would be converted but
+  not corrected. The next calibration updates everything.
 * **LVDT coefficients** (a = 1.222 mm/V, b = 0.25 V for both LVDTs) come from Glenn Sasagawa's
   processing and will be re-checked after the 2027 recovery. Days converted before converter
   version 4 have no `LE9`; `scpr.py day START --end END --reconvert` adds it from the raw files.

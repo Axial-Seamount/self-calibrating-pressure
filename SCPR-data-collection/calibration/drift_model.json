@@ -4,8 +4,8 @@
   "offsets": "glenn",
   "event_scatter_pa": 30.0,
   "tail_events": 4,
-  "max_drift_sigma_pa": 100.0,
-  "drift_model_version": 3,
+  "max_drift_sigma_pa": null,
+  "drift_model_version": 4,
   "thermal_adjustment": true,
   "exclude_before": "2018-07-07",
   "max_extrapolation_days": 365.0,
@@ -45,7 +45,7 @@
         "formula": "sqrt(sigma0^2 + (rate * years since last event)^2)"
       },
       "last_event_utc": "2026-02-05T17:02:18.704925Z",
-      "valid_until_utc": "2026-08-21T15:01:18Z",
+      "valid_until_utc": "2027-02-05T17:02:18Z",
       "events": [
         {
           "t0_utc": "2018-07-09T22:13:57.788164Z",
@@ -397,7 +397,7 @@
         "formula": "sqrt(sigma0^2 + (rate * years since last event)^2)"
       },
       "last_event_utc": "2026-02-05T17:02:18.627683Z",
-      "valid_until_utc": "2026-08-21T15:01:18Z",
+      "valid_until_utc": "2027-02-05T17:02:18Z",
       "events": [
         {
           "t0_utc": "2018-07-09T22:13:57.768390Z",
